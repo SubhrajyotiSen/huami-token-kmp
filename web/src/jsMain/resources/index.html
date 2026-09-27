@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>huami-token — Bluetooth key lookup</title>
+<style>
+  :root {
+    --ink: #16130e;
+    --paper: #f4efe6;
+    --card: #fffdf8;
+    --line: #e2d9c8;
+    --accent: #c2410c;
+    --accent-soft: #fbe3d3;
+    --ok: #166534;
+    --bad: #b91c1c;
+    --muted: #6b6257;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 64px; }
+  header.top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header.top h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; }
+  header.top h1 span { color: #f59e0b; }
+  .ver {
+    font-family: var(--mono); font-size: 12px; color: var(--ink);
+    background: #f59e0b; border-radius: 999px; padding: 2px 10px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 28px;
+    background: var(--card); color: #241f18; border-radius: 14px; overflow: hidden; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .about { padding: 28px; background: var(--card); }
+  .about h2 { margin: 0 0 8px; font-size: 19px; }
+  .about p { margin: 10px 0; font-size: 14.5px; }
+  .about ol { margin: 10px 0; padding-left: 20px; font-size: 14.5px; }
+  .about code { font-family: var(--mono); font-size: 12.5px; background: #efe7d6;
+    padding: 1px 6px; border-radius: 5px; }
+  .formpane { padding: 28px; background: #ece4d2; border-left: 1px solid var(--line); }
+  @media (max-width: 760px) { .formpane { border-left: none; border-top: 1px solid var(--line); } }
+  .method { display: flex; gap: 8px; margin-bottom: 16px; }
+  .method label { flex: 1; }
+  .method input { position: absolute; opacity: 0; pointer-events: none; }
+  .method .pill {
+    display: block; text-align: center; font-size: 14px; font-weight: 600;
+    border: 1.5px solid #b9ac93; border-radius: 9px; padding: 9px 0; cursor: pointer;
+    background: transparent; color: #241f18;
+  }
+  .method input:checked + .pill { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .method input:focus-visible + .pill { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label.field { display: block; font-size: 13.5px; font-weight: 600; margin: 12px 0 5px; }
+  input.text {
+    width: 100%; font-size: 15px; padding: 10px 12px; border-radius: 8px;
+    border: 1.5px solid #b9ac93; background: #fffdf8; color: #241f18;
+  }
+  input.text:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  button.go {
+    width: 100%; margin-top: 18px; font-size: 15.5px; font-weight: 700;
+    color: #fff; background: var(--accent); border: none; border-radius: 8px;
+    padding: 12px; cursor: pointer;
+  }
+  button.go:hover { background: #9a3412; }
+  button.go:disabled { background: #a89c86; cursor: wait; }
+  details.adv { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  details.adv summary { cursor: pointer; }
+  .status { margin-top: 14px; font-size: 14px; min-height: 22px; }
+  .status.busy { color: var(--accent); }
+  .results { margin-top: 24px; display: none; }
+  .results.show { display: block; }
+  .results h2 { font-size: 18px; margin: 0 0 12px; }
+  .dev {
+    background: var(--card); color: #241f18; border-radius: 10px;
+    border-left: 6px solid #f59e0b; padding: 14px 18px; margin-bottom: 12px;
+  }
+  .dev h3 { margin: 0 0 6px; font-size: 15.5px; }
+  .dev dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; gap: 3px 10px; font-size: 14px; }
+  .dev dt { color: var(--muted); }
+  .dev dd { margin: 0; font-family: var(--mono); font-size: 13px; word-break: break-all; }
+  .err {
+    display: none; margin-top: 24px; background: #fdecec; color: var(--bad);
+    border: 1.5px solid #f3b4b4; border-radius: 10px; padding: 13px 16px; font-size: 14px;
+  }
+  .err.show { display: block; }
+  footer { margin-top: 32px; font-size: 13px; color: #a89c86; }
+  footer a { color: #f59e0b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>huami<span>-token</span></h1>
+    <span class="ver">Kotlin Multiplatform port</span>
+  </header>
+
+  <div class="grid">
+    <section class="about">
+      <h2>Why does this page exist?</h2>
+      <p>
+        Newer Amazfit, Zepp and Xiaomi watches and bands refuse to pair with
+        open-source companions like
+        <a href="https://gadgetbridge.org/basics/pairing/huami-xiaomi-server/">Gadgetbridge</a>
+        unless you also provide the watch's unique Bluetooth pairing key.
+      </p>
+      <p>
+        That key lives on Huami/Xiaomi servers next to your paired devices.
+        This tool logs in with your account, lists the bound devices and shows
+        each <code>Key</code> so you can paste it into Gadgetbridge.
+      </p>
+      <ol>
+        <li>Pick Amazfit (Zepp app) or Xiaomi (Mi Fitness).</li>
+        <li>Enter the e-mail and password of that account.</li>
+        <li>Press <b>Get Bluetooth keys</b> and copy the key.</li>
+      </ol>
+      <p>Your password is sent only to the vendor's login servers, never stored.</p>
+    </section>
+
+    <section class="formpane">
+      <div class="method" role="radiogroup" aria-label="Login method">
+        <label><input type="radio" name="method" value="amazfit" checked><span class="pill">Amazfit / Zepp</span></label>
+        <label><input type="radio" name="method" value="xiaomi"><span class="pill">Xiaomi</span></label>
+      </div>
+      <label class="field" for="username">Account e-mail (username)</label>
+      <input class="text" id="username" type="email" autocomplete="username" placeholder="you@example.com">
+      <label class="field" for="password">Password</label>
+      <input class="text" id="password" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button class="go" id="go">Get Bluetooth keys</button>
+      <div class="status" id="status" role="status"></div>
+      <details class="adv">
+        <summary>Advanced: CORS proxy prefix</summary>
+        <p>Browsers block cross-origin calls. If the request is blocked, run a CORS proxy and paste its prefix here (it is prepended to every URL).</p>
+        <input class="text" id="proxy" type="url" placeholder="https://proxy.example/?url=">
+      </details>
+    </section>
+  </div>
+
+  <section class="results" id="results">
+    <h2>Paired devices</h2>
+    <div id="devices"></div>
+  </section>
+  <div class="err" id="error" role="alert"></div>
+
+  <footer>
+    Port of <a href="https://codeberg.org/argrento/huami-token/">huami-token</a> (MIT).
+    Keys shown as <code>0x…</code> go straight into Gadgetbridge's pairing dialog.
+  </footer>
+</div>
+<script src="huami-token-web.js"></script>
+</body>
+</html>
