@@ -6,7 +6,7 @@ function applyCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
     res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, Cookie, X-Requested-With, X-Target-URL, X-Cookie, X-Set-Cookie, x-target-url, x-cookie, x-set-cookie'
+        'Content-Type, Authorization, Cookie, X-Requested-With, X-Target-URL, X-Cookie, X-Set-Cookie, X-User-Agent, x-target-url, x-cookie, x-set-cookie, x-user-agent'
     );
     res.setHeader(
         'Access-Control-Expose-Headers',
@@ -46,24 +46,14 @@ function extractTargetUrl(req) {
     return null;
 }
 
-async function readRequestBody(req, method, contentType) {
+async function readRequestBody(req, method) {
     if (method === 'GET' || method === 'HEAD') return undefined;
 
     if (req.body !== undefined && req.body !== null) {
         if (Buffer.isBuffer(req.body)) return req.body;
         if (req.body instanceof Uint8Array) return Buffer.from(req.body);
         if (typeof req.body === 'string') return Buffer.from(req.body, 'utf-8');
-        if (typeof req.body === 'object') {
-            const isForm = contentType && contentType.toLowerCase().includes('application/x-www-form-urlencoded');
-            if (isForm) {
-                const params = new URLSearchParams();
-                for (const [k, v] of Object.entries(req.body)) {
-                    params.append(k, String(v));
-                }
-                return Buffer.from(params.toString(), 'utf-8');
-            }
-            return Buffer.from(JSON.stringify(req.body), 'utf-8');
-        }
+        if (typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf-8');
     }
 
     if (typeof req.on === 'function') {
@@ -136,7 +126,7 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const skipHeaders = new Set(['host', 'connection', 'content-length', 'origin', 'referer', 'x-target-url', 'x-url']);
+    const skipHeaders = new Set(['host', 'connection', 'content-length', 'origin', 'referer', 'x-target-url', 'x-url', 'x-user-agent']);
     const fetchHeaders = {};
 
     if (req.headers && typeof req.headers === 'object') {
@@ -152,13 +142,15 @@ module.exports = async function handler(req, res) {
         fetchHeaders['cookie'] = customCookie.trim();
     }
 
-    if (!fetchHeaders['user-agent'] && !fetchHeaders['User-Agent']) {
-        fetchHeaders['User-Agent'] = 'huami-token-kmp/0.8.0';
+    const customUa = req.headers?.['x-user-agent'] || req.headers?.['X-User-Agent'];
+    if (customUa && typeof customUa === 'string' && customUa.trim()) {
+        fetchHeaders['user-agent'] = customUa.trim();
+    } else if (!fetchHeaders['user-agent'] && !fetchHeaders['User-Agent']) {
+        fetchHeaders['user-agent'] = 'huami-token-kmp/0.8.0';
     }
 
     try {
-        const contentType = fetchHeaders['content-type'] || fetchHeaders['Content-Type'];
-        const body = await readRequestBody(req, method, contentType);
+        const body = await readRequestBody(req, method);
 
         const response = await fetch(targetUrl, {
             method,
@@ -207,4 +199,10 @@ module.exports = async function handler(req, res) {
             error: `Failed to connect to target URL (${targetUrl}): ${err.message}`
         }));
     }
+};
+
+module.exports.config = {
+    api: {
+        bodyParser: false,
+    },
 };

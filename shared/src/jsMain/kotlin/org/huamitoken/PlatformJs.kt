@@ -28,7 +28,12 @@ actual class HttpEngine actual constructor() {
 
         var fullUrl = targetUrl
         val jsHeaders = js("{}")
-        for ((k, v) in headers) jsHeaders[k] = v
+        for ((k, v) in headers) {
+            jsHeaders[k] = v
+            if (k.equals("user-agent", ignoreCase = true)) {
+                jsHeaders["X-User-Agent"] = v
+            }
+        }
         if (cookies.isNotEmpty()) {
             val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
             jsHeaders["Cookie"] = cookieStr
