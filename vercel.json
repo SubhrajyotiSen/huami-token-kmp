@@ -1,5 +1,5 @@
 {
-  "buildCommand": "./gradlew :web:jsBrowserDistribution :serverlessProxy:copyVercelProxy",
+  "buildCommand": "./gradlew :web:jsBrowserDistribution",
   "outputDirectory": "web/build/dist/js/productionExecutable",
   "rewrites": [
     {

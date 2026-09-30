@@ -65,7 +65,7 @@ with a completion handler.
 
 Browsers enforce Same-Origin Policies (SOP) and restrict access to HTTP response cookies (`Set-Cookie`). Because upstream Zepp/Amazfit and Xiaomi authentication endpoints do not send permissive CORS headers, direct client-side browser requests are blocked. Furthermore, standard browser `fetch` calls cannot access the `Set-Cookie` headers containing `serviceToken` required for Xiaomi authentication.
 
-To eliminate these browser limitations and maximize utility across web environments, this project includes a Kotlin/JS serverless proxy route (`:serverlessProxy`):
+To eliminate these browser limitations and maximize utility across web environments, this project includes a standalone Node.js serverless proxy route (`api/proxy.js`):
 
 - **Amazfit / Zepp Login:** Direct client requests or proxy routing handle token exchanges.
 - **Xiaomi Login:** Fully functional when routed through the serverless proxy, which extracts and forwards authentication cookies (`serviceToken` via `x-received-cookies` / `X-Cookie`).
@@ -73,13 +73,13 @@ To eliminate these browser limitations and maximize utility across web environme
 
 ## Vercel Deployment
 
-The project is preconfigured with `vercel.json` to deploy both the Kotlin/JS single-page web application (`:web`) and the Kotlin/JS serverless API proxy (`:serverlessProxy`) in a single cohesive build.
+The project is preconfigured with `vercel.json` to deploy the single-page web application (`:web`) alongside the zero-dependency standalone Node.js serverless proxy (`api/proxy.js`).
 
 ### 1. Build and Route Architecture (`vercel.json`)
 
 ```json
 {
-  "buildCommand": "./gradlew :web:jsBrowserDistribution :serverlessProxy:copyVercelProxy",
+  "buildCommand": "./gradlew :web:jsBrowserDistribution",
   "outputDirectory": "web/build/dist/js/productionExecutable",
   "rewrites": [
     {
@@ -91,7 +91,7 @@ The project is preconfigured with `vercel.json` to deploy both the Kotlin/JS sin
 ```
 
 - **Static Web Frontend:** Compiled from `:web` to `web/build/dist/js/productionExecutable` (serving `index.html` and `huami-token-web.js`).
-- **Serverless API Function:** Compiled from `:serverlessProxy` into `api/huami-token-kmp-serverlessProxy.js` and loaded by `api/proxy.js` to handle `/api/proxy?url=...`.
+- **Serverless API Function:** Executed directly from `api/proxy.js` on Node.js without requiring extra Gradle compilation or cold-start penalties, handling `/api/proxy?url=...`.
 
 ### 2. Deployment Instructions
 
@@ -101,9 +101,9 @@ The project is preconfigured with `vercel.json` to deploy both the Kotlin/JS sin
    ```bash
    npm install -g vercel
    ```
-2. Build the production web bundle and serverless function proxy:
+2. Build the production web bundle:
    ```bash
-   ./gradlew :web:jsBrowserDistribution :serverlessProxy:copyVercelProxy
+   ./gradlew :web:jsBrowserDistribution
    ```
 3. Deploy to Vercel:
    ```bash
@@ -119,7 +119,7 @@ The project is preconfigured with `vercel.json` to deploy both the Kotlin/JS sin
 1. Push the repository to GitHub, GitLab, or Bitbucket.
 2. Import the project in the [Vercel Dashboard](https://vercel.com/new).
 3. Ensure the build environment has Java 17+ available or pre-build artifacts via CI/CD before deploying.
-4. Vercel automatically applies `vercel.json`, building both the web interface and the serverless proxy to deliver full multiplatform functionality.
+4. Vercel automatically applies `vercel.json`, building the web interface and executing `api/proxy.js` to deliver full multiplatform functionality with fast build times.
 
 ## Credits & Attribution
 
