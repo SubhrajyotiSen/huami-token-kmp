@@ -33,6 +33,9 @@ actual class HttpEngine actual constructor() {
             if (k.equals("user-agent", ignoreCase = true)) {
                 jsHeaders["X-User-Agent"] = v
             }
+            if (k.equals("content-type", ignoreCase = true)) {
+                jsHeaders["X-Content-Type"] = v
+            }
         }
         if (cookies.isNotEmpty()) {
             val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
@@ -42,6 +45,10 @@ actual class HttpEngine actual constructor() {
 
         if (proxyPrefix.isNotEmpty()) {
             jsHeaders["X-Target-URL"] = targetUrl
+            if (body != null) {
+                // Prevent serverless platforms from auto-parsing binary bodies as form text
+                jsHeaders["Content-Type"] = "application/octet-stream"
+            }
             if (proxyPrefix.endsWith("?url=") || proxyPrefix.endsWith("&url=")) {
                 val encodedTarget = js("encodeURIComponent(targetUrl)").unsafeCast<String>()
                 fullUrl = proxyPrefix + encodedTarget

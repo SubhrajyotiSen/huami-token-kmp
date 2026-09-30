@@ -6,7 +6,7 @@ function applyCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
     res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, Cookie, X-Requested-With, X-Target-URL, X-Cookie, X-Set-Cookie, X-User-Agent, x-target-url, x-cookie, x-set-cookie, x-user-agent'
+        'Content-Type, Authorization, Cookie, X-Requested-With, X-Target-URL, X-Cookie, X-Set-Cookie, X-User-Agent, X-Content-Type, x-target-url, x-cookie, x-set-cookie, x-user-agent, x-content-type'
     );
     res.setHeader(
         'Access-Control-Expose-Headers',
@@ -52,8 +52,16 @@ async function readRequestBody(req, method) {
     if (req.body !== undefined && req.body !== null) {
         if (Buffer.isBuffer(req.body)) return req.body;
         if (req.body instanceof Uint8Array) return Buffer.from(req.body);
-        if (typeof req.body === 'string') return Buffer.from(req.body, 'utf-8');
-        if (typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf-8');
+        if (typeof req.body === 'string') {
+            if (req.body.length === 0) return undefined;
+            return Buffer.from(req.body, 'utf-8');
+        }
+        if (typeof req.body === 'object') {
+            const keys = Object.keys(req.body);
+            if (keys.length > 0) {
+                return Buffer.from(JSON.stringify(req.body), 'utf-8');
+            }
+        }
     }
 
     if (typeof req.on === 'function') {
@@ -126,7 +134,18 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const skipHeaders = new Set(['host', 'connection', 'content-length', 'origin', 'referer', 'x-target-url', 'x-url', 'x-user-agent']);
+    const skipHeaders = new Set([
+        'host',
+        'connection',
+        'content-length',
+        'origin',
+        'referer',
+        'x-target-url',
+        'x-url',
+        'x-user-agent',
+        'x-content-type',
+        'x-cookie',
+    ]);
     const fetchHeaders = {};
 
     if (req.headers && typeof req.headers === 'object') {
@@ -135,6 +154,11 @@ module.exports = async function handler(req, res) {
                 fetchHeaders[key] = value;
             }
         }
+    }
+
+    const customContentType = req.headers?.['x-content-type'] || req.headers?.['X-Content-Type'];
+    if (customContentType && typeof customContentType === 'string' && customContentType.trim()) {
+        fetchHeaders['content-type'] = customContentType.trim();
     }
 
     const customCookie = req.headers?.['x-cookie'] || req.headers?.['X-Cookie'];
