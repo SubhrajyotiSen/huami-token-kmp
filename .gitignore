@@ -187,3 +187,7 @@ fabric.properties
 # End of https://www.toptal.com/developers/gitignore/api/kotlin,android,androidstudio
 
 .kotlin
+
+# Vercel serverless function build output
+/api/*
+!/api/proxy.js

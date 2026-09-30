@@ -363,6 +363,7 @@ fun TokenScreen(
                                                     color = MaterialTheme.colorScheme.primary,
                                                     textDecoration = TextDecoration.Underline,
                                                 ),
+                                                color = MaterialTheme.colorScheme.primary,
                                             )
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,

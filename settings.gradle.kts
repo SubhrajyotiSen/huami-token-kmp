@@ -20,5 +20,6 @@ rootProject.name = "huami-token-kmp"
 include(":shared")
 include(":cli")
 include(":web")
+include(":serverlessProxy")
 include(":androidApp")
 include(":desktopApp")

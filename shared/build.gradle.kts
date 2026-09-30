@@ -6,6 +6,16 @@ plugins {
 }
 
 kotlin {
+    applyDefaultHierarchyTemplate {
+        common {
+            group("compose") {
+                withJvm()
+                withIos()
+                withCompilations { it.target.name.startsWith("android") }
+            }
+        }
+    }
+
     jvm()
     androidLibrary {
         namespace = "org.huamitoken.shared"
@@ -29,14 +39,19 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
             implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.materialIconsExtended)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+
+        val composeMain by getting {
+            dependencies {
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+            }
         }
     }
 }

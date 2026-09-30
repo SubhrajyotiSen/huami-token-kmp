@@ -31,9 +31,9 @@ actual class HttpEngine actual constructor() {
         val jsHeaders = js("{}")
         for ((k, v) in headers) jsHeaders[k] = v
         if (cookies.isNotEmpty()) {
-            // Note: browsers forbid setting Cookie via fetch; Xiaomi login needs
-            // these cookies, so use Android/iOS/CLI for Xiaomi or a same-origin backend.
-            jsHeaders["Cookie"] = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+            val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+            jsHeaders["Cookie"] = cookieStr
+            jsHeaders["X-Cookie"] = cookieStr
         }
         init.headers = jsHeaders
         if (body != null) init.body = body.toUint8Array()
@@ -43,10 +43,24 @@ actual class HttpEngine actual constructor() {
         val buffer = (response.arrayBuffer().unsafeCast<Promise<ArrayBuffer>>().await())
         val bytes = Uint8Array(buffer).toByteArray()
         val respHeaders = mutableMapOf<String, String>()
-        val location: String? = response.headers.get("location") as? String
+        val location: String? = (response.headers.get("location") as? String)
+            ?: (response.headers.get("x-location") as? String)
         if (location != null) respHeaders["Location"] = location
-        // Set-Cookie is a forbidden header in browsers and never visible here.
-        return HttpResult(status, bytes, respHeaders, emptyMap())
+
+        val respCookies = mutableMapOf<String, String>()
+        val setCookieHeader = (response.headers.get("x-received-cookies") as? String)
+            ?: (response.headers.get("x-set-cookie") as? String)
+            ?: (response.headers.get("set-cookie") as? String)
+        if (setCookieHeader != null) {
+            for (part in setCookieHeader.split(",")) {
+                val pair = part.substringBefore(";").trim()
+                val i = pair.indexOf("=")
+                if (i > 0) {
+                    respCookies[pair.substring(0, i).trim()] = pair.substring(i + 1).trim()
+                }
+            }
+        }
+        return HttpResult(status, bytes, respHeaders, respCookies)
     }
 }
 
