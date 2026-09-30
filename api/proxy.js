@@ -105,6 +105,42 @@ function extractResponseCookies(response) {
     return cookies;
 }
 
+const HOP_BY_HOP_HEADERS = new Set([
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'trailers',
+    'transfer-encoding',
+    'upgrade',
+    'content-length',
+    'host',
+    'origin',
+    'referer',
+    'priority',
+]);
+
+function shouldSkipHeader(name) {
+    const lower = name.toLowerCase();
+    if (HOP_BY_HOP_HEADERS.has(lower)) return true;
+    if (lower.startsWith('x-forwarded-')) return true;
+    if (lower.startsWith('x-real-')) return true;
+    if (lower.startsWith('x-vercel-')) return true;
+    if (lower.startsWith('sec-')) return true;
+    if (
+        lower.startsWith('x-target-') ||
+        lower === 'x-url' ||
+        lower === 'x-user-agent' ||
+        lower === 'x-content-type' ||
+        lower === 'x-cookie'
+    ) {
+        return true;
+    }
+    return false;
+}
+
 module.exports = async function handler(req, res) {
     applyCorsHeaders(res);
 
@@ -134,23 +170,11 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const skipHeaders = new Set([
-        'host',
-        'connection',
-        'content-length',
-        'origin',
-        'referer',
-        'x-target-url',
-        'x-url',
-        'x-user-agent',
-        'x-content-type',
-        'x-cookie',
-    ]);
     const fetchHeaders = {};
 
     if (req.headers && typeof req.headers === 'object') {
         for (const [key, value] of Object.entries(req.headers)) {
-            if (!skipHeaders.has(key.toLowerCase()) && value !== undefined) {
+            if (!shouldSkipHeader(key) && value !== undefined) {
                 fetchHeaders[key] = value;
             }
         }
