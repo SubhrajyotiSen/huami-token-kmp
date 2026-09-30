@@ -1,6 +1,6 @@
 {
   "buildCommand": "./gradlew :web:jsBrowserDistribution :serverlessProxy:copyVercelProxy",
-  "outputDirectory": "build/dist/js/productionExecutable",
+  "outputDirectory": "web/build/dist/js/productionExecutable",
   "rewrites": [
     {
       "source": "/api/proxy",

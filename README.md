@@ -80,7 +80,7 @@ The project is preconfigured with `vercel.json` to deploy both the Kotlin/JS sin
 ```json
 {
   "buildCommand": "./gradlew :web:jsBrowserDistribution :serverlessProxy:copyVercelProxy",
-  "outputDirectory": "build/dist/js/productionExecutable",
+  "outputDirectory": "web/build/dist/js/productionExecutable",
   "rewrites": [
     {
       "source": "/api/proxy",
@@ -90,7 +90,7 @@ The project is preconfigured with `vercel.json` to deploy both the Kotlin/JS sin
 }
 ```
 
-- **Static Web Frontend:** Compiled from `:web` to `build/dist/js/productionExecutable` (serving `index.html` and `huami-token-web.js`).
+- **Static Web Frontend:** Compiled from `:web` to `web/build/dist/js/productionExecutable` (serving `index.html` and `huami-token-web.js`).
 - **Serverless API Function:** Compiled from `:serverlessProxy` into `api/huami-token-kmp-serverlessProxy.js` and loaded by `api/proxy.js` to handle `/api/proxy?url=...`.
 
 ### 2. Deployment Instructions

@@ -22,4 +22,4 @@ kotlin {
 }
 
 // `gradle :web:jsBrowserDevelopmentRun` serves index.html + bundle locally.
-// `gradle :web:jsBrowserDistribution` emits build/dist/js/productionExecutable/.
+// `gradle :web:jsBrowserDistribution` emits web/build/dist/js/productionExecutable/.
