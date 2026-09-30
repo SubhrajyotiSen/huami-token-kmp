@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
+    color-scheme: light;
     --m3-primary: #00668B;
     --m3-on-primary: #FFFFFF;
     --m3-primary-container: #C2E8FF;
@@ -44,6 +45,7 @@
   }
 
   [data-theme="dark"] {
+    color-scheme: dark;
     --m3-primary: #67D3FF;
     --m3-on-primary: #003549;
     --m3-primary-container: #004D68;
@@ -167,7 +169,7 @@
     box-shadow: var(--m3-shadow);
   }
   .card-outlined {
-    background: var(--m3-surface-container-lowest);
+    background: var(--m3-surface);
     border: 1px solid var(--m3-outline-variant);
     border-radius: var(--radius-l);
     padding: 20px;
@@ -326,6 +328,11 @@
     margin-top: 1px;
   }
 
+  ::selection {
+    background: var(--m3-primary-container);
+    color: var(--m3-on-primary-container);
+  }
+
   /* M3 Outlined Text Field */
   .text-field-container {
     position: relative;
@@ -338,12 +345,13 @@
     align-items: center;
     border: 1px solid var(--m3-outline);
     border-radius: var(--radius-s);
-    background: var(--m3-surface-container-lowest);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    background: var(--m3-surface-container-low);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   }
   .text-field-box:focus-within {
     border-color: var(--m3-primary);
     box-shadow: 0 0 0 1px var(--m3-primary);
+    background: var(--m3-surface);
   }
   .field-leading-icon {
     padding-left: 12px;
@@ -366,9 +374,25 @@
     font-family: var(--font-sans);
     outline: none;
     width: 100%;
+    color-scheme: inherit;
   }
   .text-field-input::placeholder {
     color: var(--m3-outline);
+  }
+  /* Fix browser autofill injecting stark white / yellow background */
+  .text-field-input:-webkit-autofill,
+  .text-field-input:-webkit-autofill:hover,
+  .text-field-input:-webkit-autofill:focus,
+  .text-field-input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--m3-on-surface) !important;
+    -webkit-box-shadow: 0 0 0px 1000px var(--m3-surface-container-low) inset !important;
+    box-shadow: 0 0 0px 1000px var(--m3-surface-container-low) inset !important;
+    caret-color: var(--m3-primary);
+    transition: background-color 5000000s ease-in-out 0s;
+  }
+  .text-field-box:focus-within .text-field-input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0px 1000px var(--m3-surface) inset !important;
+    box-shadow: 0 0 0px 1000px var(--m3-surface) inset !important;
   }
   .field-trailing-btn {
     padding: 0 10px;
