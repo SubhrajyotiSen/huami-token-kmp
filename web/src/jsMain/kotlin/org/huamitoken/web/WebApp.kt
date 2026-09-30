@@ -18,6 +18,8 @@ import org.w3c.dom.HTMLInputElement
 
 private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+private const val DEFAULT_PROXY_PREFIX = "/api/proxy?url="
+
 private var currentMethod = LoginMethod.AMAZFIT
 
 fun main() {
@@ -31,8 +33,13 @@ fun main() {
     goBtn.addEventListener("click", {
         val username = (document.getElementById("username") as HTMLInputElement).value.trim()
         val password = (document.getElementById("password") as HTMLInputElement).value
-        val proxy = (document.getElementById("proxy") as HTMLInputElement).value.trim()
-        runLookup(currentMethod, username, password, proxy)
+        val rawProxy = (document.getElementById("proxy") as HTMLInputElement).value.trim()
+        val effectiveProxy = when {
+            rawProxy.equals("direct", ignoreCase = true) || rawProxy.equals("none", ignoreCase = true) -> ""
+            rawProxy.isNotEmpty() -> rawProxy
+            else -> DEFAULT_PROXY_PREFIX
+        }
+        runLookup(currentMethod, username, password, effectiveProxy)
     })
 }
 

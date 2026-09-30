@@ -775,7 +775,7 @@
       <div class="notice-box" id="xiaomi-notice" style="display: none;">
         <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
         <span>
-          <strong>Browser Limitation:</strong> Xiaomi login requires reading response cookies (<code>serviceToken</code>) which browsers prohibit JavaScript from accessing. Use the CLI, Android, Desktop, or iOS app for Xiaomi accounts, or run a dedicated CORS backend proxy.
+          <strong>Xiaomi Note:</strong> Xiaomi login is handled via the built-in proxy (<code>/api/proxy</code>) which relays session cookies (<code>serviceToken</code>). If not using the proxy, use the CLI, Android, Desktop, or iOS app.
         </span>
       </div>
 
@@ -811,9 +811,9 @@
       <details class="accordion-adv">
         <summary>Advanced: CORS proxy prefix</summary>
         <div class="accordion-adv-body">
-          <span>Browsers block direct cross-origin calls. If requests are blocked by CORS, specify a CORS proxy prefix:</span>
+          <span>Cross-origin browser requests route through <code>/api/proxy?url=</code> by default. Specify a custom proxy prefix or "direct" for direct calls:</span>
           <div class="text-field-box">
-            <input class="text-field-input" id="proxy" type="url" placeholder="https://proxy.example/?url=">
+            <input class="text-field-input" id="proxy" type="url" placeholder="/api/proxy?url=">
           </div>
         </div>
       </details>

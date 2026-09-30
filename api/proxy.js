@@ -10,54 +10,60 @@ function applyCorsHeaders(res) {
     );
     res.setHeader(
         'Access-Control-Expose-Headers',
-        'Set-Cookie, Location, X-Set-Cookie, x-received-cookies, x-set-cookie, Content-Type, Content-Length, Date'
+        'Set-Cookie, Location, X-Set-Cookie, x-received-cookies, x-set-cookie, x-location, Content-Type, Content-Length, Date'
     );
     res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
 function extractTargetUrl(req) {
-    // 1. Check req.query.url (Vercel parsed query)
-    if (req.query && typeof req.query.url === 'string' && req.query.url.trim()) {
-        return req.query.url.trim();
-    }
-
-    // 2. Check custom headers
+    // 1. Check custom headers
     const headerTarget = req.headers?.['x-target-url'] || req.headers?.['x-url'];
     if (typeof headerTarget === 'string' && headerTarget.trim()) {
         return headerTarget.trim();
     }
 
+    // 2. Check req.query.url (Vercel parsed query)
+    if (req.query && typeof req.query.url === 'string' && req.query.url.trim()) {
+        return req.query.url.trim();
+    }
+
     // 3. Fallback: Parse raw req.url
     if (typeof req.url === 'string') {
-        const qIndex = req.url.indexOf('?');
-        if (qIndex !== -1 && qIndex < req.url.length - 1) {
-            const queryStr = req.url.substring(qIndex + 1);
-            for (const pair of queryStr.split('&')) {
-                const eq = pair.indexOf('=');
-                if (eq > 0) {
-                    try {
-                        const key = decodeURIComponent(pair.substring(0, eq));
-                        if (key === 'url') {
-                            const val = decodeURIComponent(pair.substring(eq + 1));
-                            if (val.trim()) return val.trim();
-                        }
-                    } catch (_) {}
-                }
+        const match = req.url.match(/[?&]url=([^&]+)/);
+        if (match && match[1]) {
+            try {
+                return decodeURIComponent(match[1]);
+            } catch (_) {
+                return match[1];
             }
+        }
+        const rawMatch = req.url.match(/[?&]url=(https?:\/\/.+)/);
+        if (rawMatch && rawMatch[1]) {
+            return rawMatch[1];
         }
     }
 
     return null;
 }
 
-async function readRequestBody(req, method) {
+async function readRequestBody(req, method, contentType) {
     if (method === 'GET' || method === 'HEAD') return undefined;
 
     if (req.body !== undefined && req.body !== null) {
         if (Buffer.isBuffer(req.body)) return req.body;
         if (req.body instanceof Uint8Array) return Buffer.from(req.body);
         if (typeof req.body === 'string') return Buffer.from(req.body, 'utf-8');
-        if (typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf-8');
+        if (typeof req.body === 'object') {
+            const isForm = contentType && contentType.toLowerCase().includes('application/x-www-form-urlencoded');
+            if (isForm) {
+                const params = new URLSearchParams();
+                for (const [k, v] of Object.entries(req.body)) {
+                    params.append(k, String(v));
+                }
+                return Buffer.from(params.toString(), 'utf-8');
+            }
+            return Buffer.from(JSON.stringify(req.body), 'utf-8');
+        }
     }
 
     if (typeof req.on === 'function') {
@@ -151,7 +157,8 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        const body = await readRequestBody(req, method);
+        const contentType = fetchHeaders['content-type'] || fetchHeaders['Content-Type'];
+        const body = await readRequestBody(req, method, contentType);
 
         const response = await fetch(targetUrl, {
             method,
@@ -180,9 +187,9 @@ module.exports = async function handler(req, res) {
             res.setHeader('x-location', location);
         }
 
-        const contentType = response.headers.get('content-type');
-        if (contentType) {
-            res.setHeader('Content-Type', contentType);
+        const respContentType = response.headers.get('content-type');
+        if (respContentType) {
+            res.setHeader('Content-Type', respContentType);
         }
 
         const arrayBuffer = await response.arrayBuffer();

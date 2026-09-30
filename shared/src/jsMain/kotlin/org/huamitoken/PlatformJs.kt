@@ -21,13 +21,12 @@ actual class HttpEngine actual constructor() {
         body: ByteArray?,
         followRedirects: Boolean,
     ): HttpResult {
-        var fullUrl = proxyPrefix + url
+        var targetUrl = url
         if (query.isNotEmpty()) {
-            fullUrl += (if (fullUrl.contains("?")) "&" else "?") + MiCrypto.formUrlEncode(query)
+            targetUrl += (if (targetUrl.contains("?")) "&" else "?") + MiCrypto.formUrlEncode(query)
         }
-        val init = js("{}")
-        init.method = method.uppercase()
-        init.redirect = if (followRedirects) "follow" else "manual"
+
+        var fullUrl = targetUrl
         val jsHeaders = js("{}")
         for ((k, v) in headers) jsHeaders[k] = v
         if (cookies.isNotEmpty()) {
@@ -35,6 +34,19 @@ actual class HttpEngine actual constructor() {
             jsHeaders["Cookie"] = cookieStr
             jsHeaders["X-Cookie"] = cookieStr
         }
+
+        if (proxyPrefix.isNotEmpty()) {
+            jsHeaders["X-Target-URL"] = targetUrl
+            if (proxyPrefix.endsWith("?url=") || proxyPrefix.endsWith("&url=")) {
+                val encodedTarget = js("encodeURIComponent(targetUrl)").unsafeCast<String>()
+                fullUrl = proxyPrefix + encodedTarget
+            } else {
+                fullUrl = proxyPrefix + targetUrl
+            }
+        }
+        val init = js("{}")
+        init.method = method.uppercase()
+        init.redirect = if (followRedirects) "follow" else "manual"
         init.headers = jsHeaders
         if (body != null) init.body = body.toUint8Array()
 
