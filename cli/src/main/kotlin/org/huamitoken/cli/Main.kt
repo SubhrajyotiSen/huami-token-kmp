@@ -17,6 +17,7 @@ private fun usage(): String = """
 usage: huami-token [-h] -m {amazfit,xiaomi} [-e EMAIL] [-p PASSWORD] [-b] [-g] [-n]
 
 Obtain Bluetooth Auth key from Amazfit (Zepp) or Xiaomi Mi Fitness.
+Port of the original project: https://codeberg.org/argrento/huami-token
 """.trimIndent()
 
 fun main(args: Array<String>) {

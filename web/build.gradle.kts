@@ -1,5 +1,5 @@
 plugins {
-    kotlin("multiplatform")
+    alias(libs.plugins.kotlin.multiplatform)
 }
 
 kotlin {
@@ -15,8 +15,8 @@ kotlin {
     sourceSets {
         jsMain.dependencies {
             implementation(project(":shared"))
-            implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+            implementation(libs.kotlinx.browser)
+            implementation(libs.kotlinx.coroutines.core)
         }
     }
 }

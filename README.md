@@ -63,3 +63,8 @@ blocked and points at the CLI/Android/iOS builds. Also note browsers never
 expose `Set-Cookie` to `fetch`, so Xiaomi login (which needs the
 `serviceToken` cookie) only works from CLI/Android/iOS or a same-origin
 backend — the UI surfaces this as an explicit error.
+
+## Credits & Attribution
+
+This project is a Kotlin Multiplatform port of the original [huami-token](https://codeberg.org/argrento/huami-token) tool by **argrento**.
+All credit for the reverse engineering of the Huami/Zepp and Xiaomi authentication protocols, endpoints, and token generation belongs to the original project and its contributors.
