@@ -24,7 +24,7 @@ kotlin {
 
     jvm()
     android {
-        namespace = "org.huamitoken.shared"
+        namespace = "org.huamitoken.shared.ui"
         compileSdk = 37
         minSdk = 24
     }
@@ -33,7 +33,7 @@ kotlin {
         iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "shared"
+            baseName = "shared-ui"
             isStatic = true
         }
     }
@@ -43,7 +43,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.kotlinx.coroutines.core)
+            api(project(":shared-core"))
             implementation(libs.compose.runtime)
         }
         commonTest.dependencies {

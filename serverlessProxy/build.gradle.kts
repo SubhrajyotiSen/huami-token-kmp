@@ -16,7 +16,7 @@ kotlin {
 
     sourceSets {
         jsMain.dependencies {
-            implementation(project(":shared"))
+            implementation(project(":shared-core"))
             implementation(libs.kotlinx.coroutines.core)
         }
         jsTest.dependencies {

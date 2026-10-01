@@ -14,7 +14,7 @@ kotlin {
 
     sourceSets {
         jsMain.dependencies {
-            implementation(project(":shared"))
+            implementation(project(":shared-core"))
             implementation(libs.kotlinx.browser)
             implementation(libs.kotlinx.coroutines.core)
         }
