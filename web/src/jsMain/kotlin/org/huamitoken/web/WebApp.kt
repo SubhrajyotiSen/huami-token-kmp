@@ -233,7 +233,10 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
                 resultsSection.classList.add("show")
             }
         } catch (e: HuamiTokenError) {
-            showError(errorCard, errorText, statusCard, resultsSection, "Lookup failed: ${e.message}")
+            val hint = if (e.code == "proxy" || e.message?.contains("403") == true || e.message?.contains("429") == true) {
+                " If the upstream server is blocking cloud IPs or asking for a captcha/2FA, use the CLI, Android, Desktop, or iOS app."
+            } else ""
+            showError(errorCard, errorText, statusCard, resultsSection, "Lookup failed: ${e.message}$hint")
         } catch (e: Exception) {
             val hint = if (e.message?.contains("fetch", ignoreCase = true) == true ||
                 e.message?.contains("CORS", ignoreCase = true) == true ||

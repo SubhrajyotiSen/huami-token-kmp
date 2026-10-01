@@ -1,256 +1,197 @@
-// Vercel Serverless Function Proxy Route
-// Standalone Node.js proxy resolving CORS and cookie forwarding (Set-Cookie / serviceToken)
+'use strict';
 
-function applyCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, Cookie, X-Requested-With, X-Target-URL, X-Cookie, X-Set-Cookie, X-User-Agent, X-Content-Type, x-target-url, x-cookie, x-set-cookie, x-user-agent, x-content-type'
-    );
-    res.setHeader(
-        'Access-Control-Expose-Headers',
-        'Set-Cookie, Location, X-Set-Cookie, x-received-cookies, x-set-cookie, x-location, Content-Type, Content-Length, Date'
-    );
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-}
+// JSON envelope (RPC) proxy for the web target.
+// Request:  POST {url, method, headers, cookies, bodyBase64, followRedirects}
+// Response: 200  {status, headers, location, setCookies[], bodyBase64}
+// Failure:  4xx/5xx {error, stage}
 
-function extractTargetUrl(req) {
-    // 1. Check custom headers
-    const headerTarget = req.headers?.['x-target-url'] || req.headers?.['x-url'];
-    if (typeof headerTarget === 'string' && headerTarget.trim()) {
-        return headerTarget.trim();
-    }
+const ALLOWED_HOST_SUFFIXES = ['huami.com', 'amazfit.com', 'zepp.com', 'xiaomi.com', 'mi.com'];
+const MAX_REDIRECTS = 5;
+const UPSTREAM_TIMEOUT_MS = 12000;
+const MAX_BODY_BYTES = 1024 * 1024;
 
-    // 2. Check req.query.url (Vercel parsed query)
-    if (req.query && typeof req.query.url === 'string' && req.query.url.trim()) {
-        return req.query.url.trim();
-    }
-
-    // 3. Fallback: Parse raw req.url
-    if (typeof req.url === 'string') {
-        const match = req.url.match(/[?&]url=([^&]+)/);
-        if (match && match[1]) {
-            try {
-                return decodeURIComponent(match[1]);
-            } catch (_) {
-                return match[1];
-            }
-        }
-        const rawMatch = req.url.match(/[?&]url=(https?:\/\/.+)/);
-        if (rawMatch && rawMatch[1]) {
-            return rawMatch[1];
-        }
-    }
-
-    return null;
-}
-
-async function readRequestBody(req, method) {
-    if (method === 'GET' || method === 'HEAD') return undefined;
-
-    if (req.body !== undefined && req.body !== null) {
-        if (Buffer.isBuffer(req.body)) return req.body;
-        if (req.body instanceof Uint8Array) return Buffer.from(req.body);
-        if (typeof req.body === 'string') {
-            if (req.body.length === 0) return undefined;
-            return Buffer.from(req.body, 'utf-8');
-        }
-        if (typeof req.body === 'object') {
-            const keys = Object.keys(req.body);
-            if (keys.length > 0) {
-                return Buffer.from(JSON.stringify(req.body), 'utf-8');
-            }
-        }
-    }
-
-    if (typeof req.on === 'function') {
-        const chunks = [];
-        for await (const chunk of req) {
-            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-        }
-        if (chunks.length > 0) {
-            return Buffer.concat(chunks);
-        }
-    }
-
-    return undefined;
-}
-
-function extractResponseCookies(response) {
-    const cookies = [];
+function isAllowedHost(rawUrl) {
+    let parsed;
     try {
-        if (typeof response.headers.getSetCookie === 'function') {
-            const list = response.headers.getSetCookie();
-            if (Array.isArray(list)) {
-                for (const c of list) {
-                    if (c && typeof c === 'string' && c.trim()) cookies.push(c.trim());
-                }
-            }
-        } else if (typeof response.headers.raw === 'function') {
-            const raw = response.headers.raw();
-            if (raw && Array.isArray(raw['set-cookie'])) {
-                for (const c of raw['set-cookie']) {
-                    if (c && typeof c === 'string' && c.trim()) cookies.push(c.trim());
-                }
-            }
-        }
-        if (cookies.length === 0) {
-            const single = response.headers.get('set-cookie');
-            if (single && typeof single === 'string' && single.trim()) {
-                cookies.push(single.trim());
-            }
-        }
-    } catch (_) {}
-    return cookies;
-}
-
-const HOP_BY_HOP_HEADERS = new Set([
-    'connection',
-    'keep-alive',
-    'proxy-authenticate',
-    'proxy-authorization',
-    'te',
-    'trailer',
-    'trailers',
-    'transfer-encoding',
-    'upgrade',
-    'content-length',
-    'host',
-    'origin',
-    'referer',
-    'priority',
-]);
-
-function shouldSkipHeader(name) {
-    const lower = name.toLowerCase();
-    if (HOP_BY_HOP_HEADERS.has(lower)) return true;
-    if (lower.startsWith('x-forwarded-')) return true;
-    if (lower.startsWith('x-real-')) return true;
-    if (lower.startsWith('x-vercel-')) return true;
-    if (lower.startsWith('sec-')) return true;
-    if (
-        lower.startsWith('x-target-') ||
-        lower === 'x-url' ||
-        lower === 'x-user-agent' ||
-        lower === 'x-content-type' ||
-        lower === 'x-cookie'
-    ) {
-        return true;
+        parsed = new URL(rawUrl);
+    } catch (_) {
+        return false;
     }
-    return false;
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return ALLOWED_HOST_SUFFIXES.some((s) => host === s || host.endsWith('.' + s));
 }
 
-module.exports = async function handler(req, res) {
-    applyCorsHeaders(res);
+function buildUpstreamRequest(envelope) {
+    if (!envelope || typeof envelope !== 'object') throw new Error('Envelope must be a JSON object');
+    if (typeof envelope.url !== 'string' || !envelope.url) throw new Error('Missing url');
+    const method = (typeof envelope.method === 'string' ? envelope.method : 'GET').toUpperCase();
+    const headers = {};
+    if (envelope.headers && typeof envelope.headers === 'object') {
+        for (const [k, v] of Object.entries(envelope.headers)) {
+            if (v === undefined || v === null) continue;
+            const lower = k.toLowerCase();
+            if (lower === 'host' || lower === 'content-length' || lower === 'cookie') continue;
+            headers[k] = String(v);
+        }
+    }
+    if (envelope.cookies && typeof envelope.cookies === 'object') {
+        const cookieStr = Object.entries(envelope.cookies)
+            .map(([k, v]) => `${k}=${v}`)
+            .join('; ');
+        if (cookieStr) headers['Cookie'] = cookieStr;
+    }
+    let body;
+    if (typeof envelope.bodyBase64 === 'string' && envelope.bodyBase64 && method !== 'GET' && method !== 'HEAD') {
+        body = Buffer.from(envelope.bodyBase64, 'base64');
+    }
+    return { url: envelope.url, method, headers, body, followRedirects: envelope.followRedirects === true };
+}
 
-    const method = (req.method || 'GET').toUpperCase();
-    if (method === 'OPTIONS') {
+function getSetCookies(headers) {
+    if (typeof headers.getSetCookie === 'function') return headers.getSetCookie();
+    const raw = headers.get('set-cookie');
+    return raw ? [raw] : [];
+}
+
+function mergeCookieHeader(existing, setCookies) {
+    const jar = new Map();
+    if (existing) {
+        for (const part of existing.split(';')) {
+            const i = part.indexOf('=');
+            if (i > 0) jar.set(part.slice(0, i).trim(), part.slice(i + 1).trim());
+        }
+    }
+    for (const sc of setCookies) {
+        const pair = sc.split(';')[0];
+        const i = pair.indexOf('=');
+        if (i > 0) jar.set(pair.slice(0, i).trim(), pair.slice(i + 1).trim());
+    }
+    return Array.from(jar.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
+}
+
+async function performUpstream(reqSpec, fetchImpl = fetch) {
+    let { url, method, body } = reqSpec;
+    const headers = { ...reqSpec.headers };
+    const allSetCookies = [];
+    for (let hop = 0; ; hop++) {
+        if (!isAllowedHost(url)) {
+            const err = new Error(`Host not allowed: ${url}`);
+            err.httpStatus = 403;
+            err.stage = 'validate';
+            throw err;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+        let response;
+        try {
+            response = await fetchImpl(url, { method, headers, body, redirect: 'manual', signal: controller.signal });
+        } catch (e) {
+            const err = new Error(e.name === 'AbortError' ? 'Upstream timeout' : `Upstream fetch failed: ${e.message}`);
+            err.httpStatus = e.name === 'AbortError' ? 504 : 502;
+            err.stage = 'fetch';
+            throw err;
+        } finally {
+            clearTimeout(timer);
+        }
+        const setCookies = getSetCookies(response.headers);
+        allSetCookies.push(...setCookies);
+        const location = response.headers.get('location');
+        const isRedirect = response.status >= 300 && response.status < 400 && location;
+        if (reqSpec.followRedirects && isRedirect && hop < MAX_REDIRECTS) {
+            url = new URL(location, url).toString();
+            if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === 'POST')) {
+                method = 'GET';
+                body = undefined;
+                for (const k of Object.keys(headers)) if (k.toLowerCase() === 'content-type') delete headers[k];
+            }
+            const cookieKey = Object.keys(headers).find((k) => k.toLowerCase() === 'cookie') || 'Cookie';
+            const merged = mergeCookieHeader(headers[cookieKey], setCookies);
+            if (merged) headers[cookieKey] = merged;
+            continue;
+        }
+        const respHeaders = {};
+        response.headers.forEach((v, k) => {
+            if (k !== 'set-cookie') respHeaders[k] = v;
+        });
+        const buf = Buffer.from(await response.arrayBuffer());
+        const result = { status: response.status, headers: respHeaders, setCookies: allSetCookies, finalUrl: url };
+        if (location) result.location = location;
+        if (buf.length > 0) result.bodyBase64 = buf.toString('base64');
+        return result;
+    }
+}
+
+async function readRawBody(req) {
+    if (req.body !== undefined && req.body !== null) {
+        if (Buffer.isBuffer(req.body)) return req.body.toString('utf-8');
+        if (typeof req.body === 'string') return req.body;
+        if (typeof req.body === 'object') return req.body; // already parsed JSON
+    }
+    if (typeof req.on !== 'function') return '';
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+        req.on('data', (c) => {
+            size += c.length;
+            if (size > MAX_BODY_BYTES) {
+                reject(new Error('Request too large'));
+                return;
+            }
+            chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+        });
+        req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+        req.on('error', reject);
+    });
+}
+
+function sendJson(res, status, obj) {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify(obj));
+}
+
+async function handler(req, res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
         res.statusCode = 204;
         res.end();
         return;
     }
-
-    const targetUrl = extractTargetUrl(req);
-    if (!targetUrl) {
-        res.statusCode = 400;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-            error: "Missing target URL. Pass 'url' query parameter (e.g. /api/proxy?url=https%3A%2F%2F...) or 'x-target-url' header."
-        }));
+    if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Use POST with a JSON envelope', stage: 'validate' });
         return;
     }
 
-    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-        res.statusCode = 400;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-            error: "Invalid URL scheme. Only http:// and https:// URLs are supported."
-        }));
+    let envelope;
+    try {
+        const raw = await readRawBody(req);
+        envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e) {
+        sendJson(res, 400, { error: `Malformed JSON envelope: ${e.message}`, stage: 'validate' });
         return;
     }
 
-    const fetchHeaders = {};
-
-    if (req.headers && typeof req.headers === 'object') {
-        for (const [key, value] of Object.entries(req.headers)) {
-            if (!shouldSkipHeader(key) && value !== undefined) {
-                fetchHeaders[key] = value;
-            }
-        }
-    }
-
-    const customContentType = req.headers?.['x-content-type'] || req.headers?.['X-Content-Type'];
-    if (customContentType && typeof customContentType === 'string' && customContentType.trim()) {
-        fetchHeaders['content-type'] = customContentType.trim();
-    }
-
-    const customCookie = req.headers?.['x-cookie'] || req.headers?.['X-Cookie'];
-    if (customCookie && typeof customCookie === 'string' && customCookie.trim()) {
-        fetchHeaders['cookie'] = customCookie.trim();
-    }
-
-    const customUa = req.headers?.['x-user-agent'] || req.headers?.['X-User-Agent'];
-    if (customUa && typeof customUa === 'string' && customUa.trim()) {
-        fetchHeaders['user-agent'] = customUa.trim();
-    } else if (!fetchHeaders['user-agent'] && !fetchHeaders['User-Agent']) {
-        fetchHeaders['user-agent'] = 'huami-token-kmp/0.8.0';
+    let spec;
+    try {
+        spec = buildUpstreamRequest(envelope);
+    } catch (e) {
+        sendJson(res, 400, { error: e.message, stage: 'validate' });
+        return;
     }
 
     try {
-        const body = await readRequestBody(req, method);
-
-        const response = await fetch(targetUrl, {
-            method,
-            headers: fetchHeaders,
-            body,
-            redirect: 'manual'
-        });
-
-        res.statusCode = response.status;
-
-        const cookies = extractResponseCookies(response);
-        if (cookies.length > 0) {
-            const joined = cookies.join('; ');
-            res.setHeader('x-received-cookies', joined);
-            res.setHeader('x-set-cookie', joined);
-            try {
-                res.setHeader('Set-Cookie', cookies);
-            } catch (_) {
-                res.setHeader('Set-Cookie', joined);
-            }
-        }
-
-        const location = response.headers.get('location');
-        if (location) {
-            res.setHeader('Location', location);
-            res.setHeader('x-location', location);
-        }
-
-        const respContentType = response.headers.get('content-type');
-        if (respContentType) {
-            res.setHeader('Content-Type', respContentType);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        const responseData = Buffer.from(arrayBuffer);
-
-        if (typeof res.send === 'function') {
-            res.send(responseData);
-        } else {
-            res.end(responseData);
-        }
-    } catch (err) {
-        res.statusCode = 502;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-            error: `Failed to connect to target URL (${targetUrl}): ${err.message}`
-        }));
+        sendJson(res, 200, await performUpstream(spec));
+    } catch (e) {
+        sendJson(res, e.httpStatus || 502, { error: e.message, stage: e.stage || 'fetch' });
     }
-};
+}
 
-module.exports.config = {
-    api: {
-        bodyParser: false,
-    },
-};
+module.exports = handler;
+module.exports.isAllowedHost = isAllowedHost;
+module.exports.buildUpstreamRequest = buildUpstreamRequest;
+module.exports.performUpstream = performUpstream;

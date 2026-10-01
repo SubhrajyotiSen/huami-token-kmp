@@ -26,35 +26,14 @@ actual class HttpEngine actual constructor() {
             targetUrl += (if (targetUrl.contains("?")) "&" else "?") + MiCrypto.formUrlEncode(query)
         }
 
-        var fullUrl = targetUrl
-        val jsHeaders = js("{}")
-        for ((k, v) in headers) {
-            jsHeaders[k] = v
-            if (k.equals("user-agent", ignoreCase = true)) {
-                jsHeaders["X-User-Agent"] = v
-            }
-            if (k.equals("content-type", ignoreCase = true)) {
-                jsHeaders["X-Content-Type"] = v
-            }
-        }
-        if (cookies.isNotEmpty()) {
-            val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
-            jsHeaders["Cookie"] = cookieStr
-            jsHeaders["X-Cookie"] = cookieStr
+        if (proxyPrefix.isNotEmpty()) {
+            return requestViaProxy(method, targetUrl, headers, cookies, body, followRedirects)
         }
 
-        if (proxyPrefix.isNotEmpty()) {
-            jsHeaders["X-Target-URL"] = targetUrl
-            if (body != null) {
-                // Prevent serverless platforms from auto-parsing binary bodies as form text
-                jsHeaders["Content-Type"] = "application/octet-stream"
-            }
-            if (proxyPrefix.endsWith("?url=") || proxyPrefix.endsWith("&url=")) {
-                val encodedTarget = js("encodeURIComponent(targetUrl)").unsafeCast<String>()
-                fullUrl = proxyPrefix + encodedTarget
-            } else {
-                fullUrl = proxyPrefix + targetUrl
-            }
+        val jsHeaders = js("{}")
+        for ((k, v) in headers) jsHeaders[k] = v
+        if (cookies.isNotEmpty()) {
+            jsHeaders["Cookie"] = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
         }
         val init = js("{}")
         init.method = method.uppercase()
@@ -62,30 +41,103 @@ actual class HttpEngine actual constructor() {
         init.headers = jsHeaders
         if (body != null) init.body = body.toUint8Array()
 
+        val fullUrl = targetUrl
         val response: dynamic = js("fetch(fullUrl, init)").unsafeCast<Promise<dynamic>>().await()
         val status = (response.status as Number).toInt()
         val buffer = (response.arrayBuffer().unsafeCast<Promise<ArrayBuffer>>().await())
         val bytes = Uint8Array(buffer).toByteArray()
         val respHeaders = mutableMapOf<String, String>()
-        val location: String? = (response.headers.get("location") as? String)
-            ?: (response.headers.get("x-location") as? String)
+        val location = response.headers.get("location") as? String
         if (location != null) respHeaders["Location"] = location
+        return HttpResult(status, bytes, respHeaders, emptyMap())
+    }
 
+    /** Sends the request as a JSON envelope to the proxy; the proxy answers with HTTP 200 + JSON. */
+    private suspend fun requestViaProxy(
+        method: String,
+        targetUrl: String,
+        headers: Map<String, String>,
+        cookies: Map<String, String>,
+        body: ByteArray?,
+        followRedirects: Boolean,
+    ): HttpResult {
+        val endpoint = proxyEndpoint(proxyPrefix)
+        val envelope = js("{}")
+        envelope.url = targetUrl
+        envelope.method = method.uppercase()
+        val envHeaders = js("{}")
+        for ((k, v) in headers) envHeaders[k] = v
+        envelope.headers = envHeaders
+        val envCookies = js("{}")
+        for ((k, v) in cookies) envCookies[k] = v
+        envelope.cookies = envCookies
+        if (body != null && body.isNotEmpty()) envelope.bodyBase64 = body.toBase64()
+        envelope.followRedirects = followRedirects
+
+        val init = js("{}")
+        init.method = "POST"
+        val reqHeaders = js("{}")
+        reqHeaders["Content-Type"] = "application/json"
+        init.headers = reqHeaders
+        init.body = JSON.stringify(envelope)
+
+        val response: dynamic = js("fetch(endpoint, init)").unsafeCast<Promise<dynamic>>().await()
+        val httpStatus = (response.status as Number).toInt()
+        val text = response.text().unsafeCast<Promise<String>>().await()
+        val json: dynamic = try {
+            JSON.parse<dynamic>(text)
+        } catch (_: Throwable) {
+            throw HuamiTokenError(
+                "proxy",
+                "Proxy returned HTTP $httpStatus with non-JSON body: ${text.take(200)}",
+            )
+        }
+        if (json == null || json.error != undefined || httpStatus != 200) {
+            val err = json?.error as? String ?: "HTTP $httpStatus"
+            val stage = json?.stage as? String ?: "unknown"
+            throw HuamiTokenError("proxy", "Proxy error ($stage): $err")
+        }
+
+        val status = (json.status as Number).toInt()
+        val b64 = json.bodyBase64 as? String
+        val bytes = if (b64.isNullOrEmpty()) ByteArray(0) else base64ToBytes(b64)
+        val respHeaders = mutableMapOf<String, String>()
+        val location = json.location as? String
+        if (location != null) respHeaders["Location"] = location
         val respCookies = mutableMapOf<String, String>()
-        val setCookieHeader = (response.headers.get("x-received-cookies") as? String)
-            ?: (response.headers.get("x-set-cookie") as? String)
-            ?: (response.headers.get("set-cookie") as? String)
-        if (setCookieHeader != null) {
-            for (part in setCookieHeader.split(",")) {
-                val pair = part.substringBefore(";").trim()
-                val i = pair.indexOf("=")
-                if (i > 0) {
-                    respCookies[pair.substring(0, i).trim()] = pair.substring(i + 1).trim()
-                }
-            }
+        val setCookies = json.setCookies
+        if (setCookies != null && setCookies != undefined) {
+            val arr = setCookies.unsafeCast<Array<String>>()
+            for (sc in arr) parseSetCookie(sc)?.let { (k, v) -> respCookies[k] = v }
         }
         return HttpResult(status, bytes, respHeaders, respCookies)
     }
+}
+
+/** Strips a legacy `?url=` suffix so `/api/proxy?url=` still works as the endpoint. */
+internal fun proxyEndpoint(prefix: String): String {
+    val i = prefix.indexOf('?')
+    return if (i >= 0) prefix.substring(0, i) else prefix
+}
+
+/** Parses a single `Set-Cookie` value (`name=value; Expires=Wed, 01 ...`) up to the first `;`. */
+internal fun parseSetCookie(setCookie: String): Pair<String, String>? {
+    val pair = setCookie.substringBefore(";").trim()
+    val i = pair.indexOf("=")
+    if (i <= 0) return null
+    return pair.substring(0, i).trim() to pair.substring(i + 1).trim()
+}
+
+private fun ByteArray.toBase64(): String {
+    val sb = StringBuilder(size)
+    for (b in this) sb.append((b.toInt() and 0xFF).toChar())
+    val bin = sb.toString()
+    return js("btoa(bin)").unsafeCast<String>()
+}
+
+private fun base64ToBytes(b64: String): ByteArray {
+    val bin = js("atob(b64)").unsafeCast<String>()
+    return ByteArray(bin.length) { bin[it].code.toByte() }
 }
 
 private fun ByteArray.toUint8Array(): Uint8Array {

@@ -71,6 +71,21 @@ To eliminate these browser limitations and maximize utility across web environme
 - **Xiaomi Login:** Fully functional when routed through the serverless proxy, which extracts and forwards authentication cookies (`serviceToken` via `x-received-cookies` / `X-Cookie`).
 - **Custom CORS Proxy Support:** The web client UI provides an *Advanced → CORS proxy prefix* field for specifying a custom proxy URL if not using the built-in route.
 
+### Proxy protocol (JSON envelope)
+
+`api/proxy.js` is not a transparent HTTP proxy. The browser sends `POST /api/proxy` with a JSON body
+`{url, method, headers, cookies, bodyBase64, followRedirects}`. The function performs the request with
+`redirect: "manual"` and always answers with HTTP 200 + JSON `{status, headers, location, setCookies[], bodyBase64}`.
+Redirect statuses (e.g. Zepp's `303`) and every `Set-Cookie` value therefore arrive as plain data that the
+browser can't rewrite. Only headers listed in the envelope are forwarded. Proxy-level failures return
+`{error, stage}` (`400` malformed, `403` host not allowed, `502` fetch failed, `504` timeout). Only
+`*.huami.com`, `*.amazfit.com`, `*.zepp.com`, `*.xiaomi.com` and `*.mi.com` are allowed as targets.
+
+### Limits that can't be fixed in code
+
+If Zepp/Xiaomi block datacenter IPs or require a captcha / 2FA, the web app shows the real upstream status
+(e.g. `403`/`429`). In that case use the CLI, Desktop, Android or iOS app, which connect from your own IP.
+
 ## Vercel Deployment
 
 The project is preconfigured with `vercel.json` to deploy the single-page web application (`:web`) alongside the zero-dependency standalone Node.js serverless proxy (`api/proxy.js`).
