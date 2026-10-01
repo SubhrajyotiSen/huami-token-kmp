@@ -9,17 +9,19 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.android)
 }
 
 android {
     namespace = "org.huamitoken.android"
-    compileSdk = 35
+    compileSdk = 37
     defaultConfig {
         applicationId = "org.huamitoken.android"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "0.8.0"
     }

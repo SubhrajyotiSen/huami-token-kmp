@@ -112,7 +112,6 @@ fun App() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TokenScreen(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -195,6 +194,78 @@ fun TokenScreen(
         }
     }
 
+    TokenScreenContent(
+        darkTheme = darkTheme,
+        onToggleTheme = onToggleTheme,
+        method = method,
+        onMethodChange = { method = it },
+        username = username,
+        onUsernameChange = { username = it },
+        password = password,
+        onPasswordChange = { password = it },
+        passwordVisible = passwordVisible,
+        onPasswordVisibleToggle = { passwordVisible = !passwordVisible },
+        busy = busy,
+        devices = devices,
+        error = error,
+        statusMessage = statusMessage,
+        isInfoExpanded = isInfoExpanded,
+        onToggleInfoExpanded = { isInfoExpanded = !isInfoExpanded },
+        onFetchDevices = onFetchDevices,
+        onDownloadGps = onDownloadGps,
+        onClearResults = { devices = null },
+        onCopyKey = { key ->
+            clipboardManager.setText(AnnotatedString(key))
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    message = "Copied Bluetooth Auth Key to clipboard",
+                    duration = SnackbarDuration.Short,
+                )
+            }
+        },
+        onCopyMac = { mac ->
+            clipboardManager.setText(AnnotatedString(mac))
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    message = "Copied MAC address to clipboard",
+                    duration = SnackbarDuration.Short,
+                )
+            }
+        },
+        onOpenAttribution = {
+            uriHandler.openUri("https://codeberg.org/argrento/huami-token")
+        },
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TokenScreenContent(
+    darkTheme: Boolean = false,
+    onToggleTheme: () -> Unit = {},
+    method: LoginMethod = LoginMethod.AMAZFIT,
+    onMethodChange: (LoginMethod) -> Unit = {},
+    username: String = "",
+    onUsernameChange: (String) -> Unit = {},
+    password: String = "",
+    onPasswordChange: (String) -> Unit = {},
+    passwordVisible: Boolean = false,
+    onPasswordVisibleToggle: () -> Unit = {},
+    busy: Boolean = false,
+    devices: List<DeviceDisplay>? = null,
+    error: String? = null,
+    statusMessage: String? = null,
+    isInfoExpanded: Boolean = false,
+    onToggleInfoExpanded: () -> Unit = {},
+    onFetchDevices: () -> Unit = {},
+    onDownloadGps: () -> Unit = {},
+    onClearResults: () -> Unit = {},
+    onCopyKey: (String) -> Unit = {},
+    onCopyMac: (String) -> Unit = {},
+    onOpenAttribution: () -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -302,7 +373,7 @@ fun TokenScreen(
                                     )
                                 }
                                 TextButton(
-                                    onClick = { isInfoExpanded = !isInfoExpanded },
+                                    onClick = onToggleInfoExpanded,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                 ) {
                                     Text(
@@ -345,7 +416,7 @@ fun TokenScreen(
                                     Column(
                                         verticalArrangement = Arrangement.spacedBy(2.dp),
                                         modifier = Modifier.clickable {
-                                            uriHandler.openUri("https://codeberg.org/argrento/huami-token")
+                                            onOpenAttribution()
                                         },
                                     ) {
                                         Text(
@@ -410,7 +481,7 @@ fun TokenScreen(
                                 methods.forEachIndexed { index, (itemMethod, label) ->
                                     SegmentedButton(
                                         selected = method == itemMethod,
-                                        onClick = { method = itemMethod },
+                                        onClick = { onMethodChange(itemMethod) },
                                         shape = SegmentedButtonDefaults.itemShape(
                                             index = index,
                                             count = methods.size,
@@ -429,7 +500,7 @@ fun TokenScreen(
                             // E-mail Input
                             OutlinedTextField(
                                 value = username,
-                                onValueChange = { username = it },
+                                onValueChange = onUsernameChange,
                                 label = { Text("Account e-mail or username") },
                                 leadingIcon = {
                                     Icon(
@@ -440,7 +511,7 @@ fun TokenScreen(
                                 },
                                 trailingIcon = {
                                     if (username.isNotEmpty()) {
-                                        IconButton(onClick = { username = "" }) {
+                                        IconButton(onClick = { onUsernameChange("") }) {
                                             Icon(
                                                 imageVector = Icons.Default.Clear,
                                                 contentDescription = "Clear e-mail",
@@ -461,7 +532,7 @@ fun TokenScreen(
                             // Password Input
                             OutlinedTextField(
                                 value = password,
-                                onValueChange = { password = it },
+                                onValueChange = onPasswordChange,
                                 label = { Text("Password") },
                                 leadingIcon = {
                                     Icon(
@@ -471,7 +542,7 @@ fun TokenScreen(
                                     )
                                 },
                                 trailingIcon = {
-                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    IconButton(onClick = onPasswordVisibleToggle) {
                                         Icon(
                                             imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
@@ -656,7 +727,7 @@ fun TokenScreen(
                             }
 
                             TextButton(
-                                onClick = { devices = null },
+                                onClick = onClearResults,
                             ) {
                                 Text("Clear")
                             }
@@ -667,24 +738,8 @@ fun TokenScreen(
                     items(list) { device ->
                         DeviceCard(
                             device = device,
-                            onCopyKey = { key ->
-                                clipboardManager.setText(AnnotatedString(key))
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Copied Bluetooth Auth Key to clipboard",
-                                        duration = SnackbarDuration.Short,
-                                    )
-                                }
-                            },
-                            onCopyMac = { mac ->
-                                clipboardManager.setText(AnnotatedString(mac))
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Copied MAC address to clipboard",
-                                        duration = SnackbarDuration.Short,
-                                    )
-                                }
-                            },
+                            onCopyKey = onCopyKey,
+                            onCopyMac = onCopyMac,
                         )
                     }
                 }
@@ -707,7 +762,7 @@ fun TokenScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.clickable {
-                                uriHandler.openUri("https://codeberg.org/argrento/huami-token")
+                                onOpenAttribution()
                             },
                         ) {
                             Text(
@@ -734,8 +789,8 @@ fun TokenScreen(
 @Composable
 fun DeviceCard(
     device: DeviceDisplay,
-    onCopyKey: (String) -> Unit,
-    onCopyMac: (String) -> Unit,
+    onCopyKey: (String) -> Unit = {},
+    onCopyMac: (String) -> Unit = {},
 ) {
     var keyCopied by remember { mutableStateOf(false) }
 

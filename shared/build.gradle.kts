@@ -1,3 +1,7 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
@@ -17,9 +21,9 @@ kotlin {
     }
 
     jvm()
-    androidLibrary {
+    android {
         namespace = "org.huamitoken.shared"
-        compileSdk = 35
+        compileSdk = 37
         minSdk = 24
     }
     listOf(
@@ -38,19 +42,36 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
-            implementation(compose.runtime)
+            implementation(libs.compose.runtime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
 
-        val composeMain by getting {
+        named("composeMain") {
             dependencies {
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.materialIconsExtended)
-                implementation(compose.ui)
-                implementation(compose.components.resources)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.material.icons.extended)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.ui.tooling.preview)
+                implementation(libs.compose.components.resources)
+            }
+        }
+
+        named("iosMain") {
+            dependsOn(getByName("composeMain"))
+        }
+
+        named("androidMain") {
+            dependencies {
+                implementation(libs.androidx.compose.ui.tooling)
+            }
+        }
+
+        named("jvmMain") {
+            dependencies {
+                implementation(libs.compose.ui.tooling)
             }
         }
     }
