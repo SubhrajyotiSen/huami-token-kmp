@@ -2,8 +2,7 @@ package org.huamitoken.ui
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.huamitoken.DeviceDisplay
+import androidx.compose.ui.tooling.preview.Preview
 import org.huamitoken.LoginMethod
 
 @Preview

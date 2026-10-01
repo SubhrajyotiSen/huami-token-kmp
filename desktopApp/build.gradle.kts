@@ -13,8 +13,8 @@ kotlin {
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
-    implementation(compose.components.uiToolingPreview)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.swing)
 }
 
