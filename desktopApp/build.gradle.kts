@@ -28,7 +28,7 @@ compose.desktop {
                 TargetFormat.Deb
             )
             packageName = "huami-token"
-            packageVersion = "0.8.0"
+            packageVersion = findProperty("VERSION_NAME") as String? ?: "1.0.1"
         }
     }
 }
