@@ -434,6 +434,11 @@
     cursor: pointer;
     transition: background 0.15s ease, opacity 0.15s ease;
   }
+
+  .gps-action {
+    width: 100%;
+    margin-top: 12px;
+  }
   .btn-primary:hover:not(:disabled) {
     opacity: 0.92;
   }
@@ -849,6 +854,10 @@
       <button class="text-btn" id="clear-results-btn">Clear</button>
     </div>
     <div id="devices" style="display: flex; flex-direction: column; gap: 12px;"></div>
+    <button class="btn-tonal gps-action" id="download-gps-btn" type="button">
+      <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      <span>Download GPS Files</span>
+    </button>
   </section>
 
   <!-- Attribution Footer -->

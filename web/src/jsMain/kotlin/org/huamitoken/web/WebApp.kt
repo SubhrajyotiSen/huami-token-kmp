@@ -12,6 +12,7 @@ import org.huamitoken.HttpEngine
 import org.huamitoken.HuamiTokenError
 import org.huamitoken.LoginMethod
 import org.huamitoken.TokenRepository
+import org.huamitoken.saveGpsFiles
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
@@ -28,6 +29,7 @@ fun main() {
     initMethodSelector()
     initInputAffordances()
     initClearResults()
+    initGpsDownload()
 
     val goBtn = document.getElementById("go") as HTMLButtonElement
     goBtn.addEventListener("click", {
@@ -202,6 +204,7 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
     val resultsSection = document.getElementById("results") as HTMLElement
     val devicesContainer = document.getElementById("devices") as HTMLElement
     val countBadge = document.getElementById("device-count-badge") as HTMLElement
+    val gpsButton = document.getElementById("download-gps-btn") as? HTMLButtonElement
 
     if (username.isBlank() || password.isEmpty()) {
         showError(errorCard, errorText, statusCard, resultsSection, "Please enter both account e-mail and password.")
@@ -221,6 +224,7 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
 
             devicesContainer.innerHTML = ""
             countBadge.textContent = "${list.size}"
+            gpsButton?.style?.display = if (method == LoginMethod.AMAZFIT) "flex" else "none"
 
             if (list.isEmpty()) {
                 statusText.textContent = "Authentication succeeded, but no bound devices were found on this account."
@@ -251,6 +255,38 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
             goText.textContent = "Get Bluetooth Keys"
         }
     }
+}
+
+private fun initGpsDownload() {
+    val button = document.getElementById("download-gps-btn") as? HTMLButtonElement ?: return
+    button.addEventListener("click", {
+        val username = (document.getElementById("username") as HTMLInputElement).value.trim()
+        val password = (document.getElementById("password") as HTMLInputElement).value
+        val rawProxy = (document.getElementById("proxy") as HTMLInputElement).value.trim()
+        val proxy = when {
+            rawProxy.equals("direct", ignoreCase = true) || rawProxy.equals("none", ignoreCase = true) -> ""
+            rawProxy.isNotEmpty() -> rawProxy
+            else -> DEFAULT_PROXY_PREFIX
+        }
+        if (username.isBlank() || password.isEmpty()) {
+            showSnackbar("Enter your credentials before downloading GPS files")
+            return@addEventListener
+        }
+        button.disabled = true
+        button.textContent = "Preparing GPS files…"
+        scope.launch {
+            try {
+                val engine = HttpEngine().also { it.proxyPrefix = proxy }
+                val files = TokenRepository(engine).fetchGpsFiles(username, password)
+                showSnackbar(saveGpsFiles(files))
+            } catch (e: Exception) {
+                showSnackbar("GPS download failed: ${e.message ?: "unknown error"}")
+            } finally {
+                button.disabled = false
+                button.textContent = "Download GPS Files"
+            }
+        }
+    })
 }
 
 private fun renderDevices(list: List<DeviceDisplay>, container: HTMLElement) {
