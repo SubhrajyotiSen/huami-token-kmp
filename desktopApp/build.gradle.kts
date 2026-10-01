@@ -6,6 +6,10 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)

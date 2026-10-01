@@ -3,6 +3,10 @@ plugins {
     application
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     implementation(project(":shared"))
     implementation(libs.kotlinx.coroutines.core)
@@ -10,6 +14,14 @@ dependencies {
 
 application {
     mainClass.set("org.huamitoken.cli.MainKt")
+}
+
+distributions {
+    main {
+        contents {
+            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        }
+    }
 }
 
 tasks.withType<JavaExec> {
