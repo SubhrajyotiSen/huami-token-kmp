@@ -98,6 +98,7 @@ private fun initMethodSelector() {
     val amazfitBtn = document.getElementById("method-amazfit") as? HTMLButtonElement ?: return
     val xiaomiBtn = document.getElementById("method-xiaomi") as? HTMLButtonElement ?: return
     val xiaomiNotice = document.getElementById("xiaomi-notice") as? HTMLElement
+    val gpsBtn = document.getElementById("download-gps-btn") as? HTMLButtonElement
 
     amazfitBtn.addEventListener("click", {
         currentMethod = LoginMethod.AMAZFIT
@@ -106,6 +107,7 @@ private fun initMethodSelector() {
         xiaomiBtn.classList.remove("active")
         xiaomiBtn.setAttribute("aria-checked", "false")
         xiaomiNotice?.style?.display = "none"
+        gpsBtn?.style?.display = "flex"
     })
 
     xiaomiBtn.addEventListener("click", {
@@ -115,6 +117,7 @@ private fun initMethodSelector() {
         amazfitBtn.classList.remove("active")
         amazfitBtn.setAttribute("aria-checked", "false")
         xiaomiNotice?.style?.display = "flex"
+        gpsBtn?.style?.display = "none"
     })
 }
 
@@ -197,6 +200,7 @@ private fun copyToClipboard(text: String, label: String, button: HTMLButtonEleme
 private fun runLookup(method: LoginMethod, username: String, password: String, proxy: String) {
     val goBtn = document.getElementById("go") as HTMLButtonElement
     val goText = document.getElementById("go-text") as HTMLElement
+    val gpsButton = document.getElementById("download-gps-btn") as? HTMLButtonElement
     val statusCard = document.getElementById("status-card") as HTMLElement
     val statusText = document.getElementById("status-text") as HTMLElement
     val errorCard = document.getElementById("error-card") as HTMLElement
@@ -204,7 +208,6 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
     val resultsSection = document.getElementById("results") as HTMLElement
     val devicesContainer = document.getElementById("devices") as HTMLElement
     val countBadge = document.getElementById("device-count-badge") as HTMLElement
-    val gpsButton = document.getElementById("download-gps-btn") as? HTMLButtonElement
 
     if (username.isBlank() || password.isEmpty()) {
         showError(errorCard, errorText, statusCard, resultsSection, "Please enter both account e-mail and password.")
@@ -214,6 +217,7 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
     goBtn.disabled = true
     goBtn.classList.add("loading")
     goText.textContent = "Contacting servers…"
+    gpsButton?.disabled = true
     statusCard.classList.remove("show")
     errorCard.classList.remove("show")
 
@@ -224,7 +228,6 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
 
             devicesContainer.innerHTML = ""
             countBadge.textContent = "${list.size}"
-            gpsButton?.style?.display = if (method == LoginMethod.AMAZFIT) "flex" else "none"
 
             if (list.isEmpty()) {
                 statusText.textContent = "Authentication succeeded, but no bound devices were found on this account."
@@ -253,12 +256,21 @@ private fun runLookup(method: LoginMethod, username: String, password: String, p
             goBtn.disabled = false
             goBtn.classList.remove("loading")
             goText.textContent = "Get Bluetooth Keys"
+            gpsButton?.disabled = false
         }
     }
 }
 
 private fun initGpsDownload() {
     val button = document.getElementById("download-gps-btn") as? HTMLButtonElement ?: return
+    val gpsText = document.getElementById("gps-text") as? HTMLElement
+    val goBtn = document.getElementById("go") as? HTMLButtonElement
+    val statusCard = document.getElementById("status-card") as HTMLElement
+    val statusText = document.getElementById("status-text") as HTMLElement
+    val errorCard = document.getElementById("error-card") as HTMLElement
+    val errorText = document.getElementById("error-text") as HTMLElement
+    val resultsSection = document.getElementById("results") as HTMLElement
+
     button.addEventListener("click", {
         val username = (document.getElementById("username") as HTMLInputElement).value.trim()
         val password = (document.getElementById("password") as HTMLInputElement).value
@@ -269,21 +281,43 @@ private fun initGpsDownload() {
             else -> DEFAULT_PROXY_PREFIX
         }
         if (username.isBlank() || password.isEmpty()) {
-            showSnackbar("Enter your credentials before downloading GPS files")
+            showError(errorCard, errorText, statusCard, resultsSection, "Please enter both account e-mail and password.")
             return@addEventListener
         }
         button.disabled = true
-        button.textContent = "Preparing GPS files…"
+        button.classList.add("loading")
+        gpsText?.textContent = "Downloading GPS files…"
+        goBtn?.disabled = true
+        statusCard.classList.remove("show")
+        errorCard.classList.remove("show")
+
         scope.launch {
             try {
                 val engine = HttpEngine().also { it.proxyPrefix = proxy }
                 val files = TokenRepository(engine).fetchGpsFiles(username, password)
-                showSnackbar(saveGpsFiles(files))
+                val path = saveGpsFiles(files)
+                val namesList = files.keys.sorted().joinToString(", ")
+                statusText.textContent = "Downloaded ${files.size} GPS file(s): $namesList\n$path"
+                statusCard.classList.add("show")
+                showSnackbar("Downloaded ${files.size} GPS file(s)")
+            } catch (e: HuamiTokenError) {
+                val hint = if (e.code == "proxy" || e.message?.contains("403") == true || e.message?.contains("429") == true) {
+                    " If the upstream server is blocking cloud IPs or asking for a captcha/2FA, use the CLI, Android, Desktop, or iOS app."
+                } else ""
+                showError(errorCard, errorText, statusCard, resultsSection, "GPS download failed: ${e.message}$hint")
             } catch (e: Exception) {
-                showSnackbar("GPS download failed: ${e.message ?: "unknown error"}")
+                val hint = if (e.message?.contains("fetch", ignoreCase = true) == true ||
+                    e.message?.contains("CORS", ignoreCase = true) == true ||
+                    e.message?.contains("Network", ignoreCase = true) == true
+                ) {
+                    " The browser blocked the request (CORS). Set a CORS-proxy prefix under Advanced, or use the CLI, Android, Desktop, or iOS app."
+                } else ""
+                showError(errorCard, errorText, statusCard, resultsSection, "GPS download failed: ${e.message ?: "Unknown error"}$hint")
             } finally {
                 button.disabled = false
-                button.textContent = "Download GPS Files"
+                button.classList.remove("loading")
+                gpsText?.textContent = "Download GPS Files"
+                goBtn?.disabled = false
             }
         }
     })
