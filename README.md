@@ -3,6 +3,16 @@
 Kotlin Multiplatform port of [huami-token](https://codeberg.org/argrento/huami-token/). It logs in to Zepp (Amazfit)
 or Xiaomi Mi Fitness servers and retrieves the Bluetooth pairing keys of bound watches/bands, for use with Gadgetbridge.
 
+## Screenshots
+
+| Desktop | Web |
+|:---:|:---:|
+| ![Desktop](screenshots/desktop.png) | ![Web](screenshots/web.png) |
+
+| Android | iOS |
+|:---:|:---:|
+| ![Android](screenshots/android.png) | ![iOS](screenshots/ios.png) |
+
 ## Modules
 
 | Module | Target | Notes |
