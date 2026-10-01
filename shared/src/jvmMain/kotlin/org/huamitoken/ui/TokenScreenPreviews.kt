@@ -2,24 +2,9 @@ package org.huamitoken.ui
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.huamitoken.DeviceDisplay
 import org.huamitoken.LoginMethod
-import androidx.compose.ui.tooling.preview.Preview
-
-val SampleDevices = listOf(
-    DeviceDisplay(
-        title = "Amazfit GTR 4",
-        mac = "12:34:56:78:90:AB",
-        active = "Yes",
-        key = "0x1234567890abcdef1234567890abcdef",
-    ),
-    DeviceDisplay(
-        title = "Xiaomi Smart Band 7",
-        mac = "FE:DC:BA:98:76:54",
-        active = null,
-        key = "0xabcdef1234567890abcdef1234567890",
-    ),
-)
 
 @Preview
 @Composable

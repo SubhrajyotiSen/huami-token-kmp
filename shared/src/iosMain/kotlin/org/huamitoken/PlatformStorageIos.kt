@@ -20,11 +20,11 @@ import platform.Foundation.writeToFile
 actual fun saveGpsFiles(files: Map<String, ByteArray>): String {
     val paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true)
     val docDir = (paths.firstOrNull() as? String) ?: ""
-    val gpsDir = (docDir as NSString).stringByAppendingPathComponent("huami-gps")
+    val gpsDir = "$docDir/huami-gps"
     NSFileManager.defaultManager.createDirectoryAtPath(gpsDir, true, null, null)
 
     for ((name, bytes) in files) {
-        val filePath = (gpsDir as NSString).stringByAppendingPathComponent(name)
+        val filePath = "$gpsDir/$name"
         val data = memScoped {
             if (bytes.isEmpty()) NSData()
             else NSData.dataWithBytes(allocArrayOf(bytes), bytes.size.toULong())

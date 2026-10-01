@@ -42,7 +42,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.compose.runtime)
+            implementation(compose.runtime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -50,12 +50,12 @@ kotlin {
 
         named("composeMain") {
             dependencies {
-                implementation(libs.compose.foundation)
-                implementation(libs.compose.material3)
-                implementation(libs.compose.material.icons.extended)
-                implementation(libs.compose.ui)
-                implementation(libs.compose.ui.tooling.preview)
-                implementation(libs.compose.components.resources)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation(compose.components.uiToolingPreview)
             }
         }
 
@@ -71,7 +71,8 @@ kotlin {
 
         named("jvmMain") {
             dependencies {
-                implementation(libs.compose.ui.tooling)
+                implementation(compose.components.uiToolingPreview)
+                implementation(compose.uiTooling)
             }
         }
     }

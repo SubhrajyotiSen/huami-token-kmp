@@ -73,20 +73,21 @@ actual class HttpEngine actual constructor() {
             }
             val http = response as? NSHTTPURLResponse
             val status = http?.statusCode?.toInt() ?: 0
-            val bytes = (data as? NSData)?.toByteArray() ?: ByteArray(0)
+            val bytes = data?.toByteArray() ?: ByteArray(0)
             val respHeaders = mutableMapOf<String, String>()
             val respCookies = mutableMapOf<String, String>()
             @Suppress("UNCHECKED_CAST")
-            val fields = http?.allHeaderFields as? Map<Any?, Any?> ?: emptyMap()
+            val fields = (http?.allHeaderFields ?: emptyMap<Any?, Any?>()) as Map<Any?, Any?>
             for ((k, v) in fields) {
                 val key = k.toString()
                 if (!key.equals("set-cookie", ignoreCase = true)) respHeaders[key] = v.toString()
             }
             val stored = NSHTTPCookie.cookiesWithResponseHeaderFields(fields, NSURL(string = fullUrl))
             @Suppress("UNCHECKED_CAST")
-            (stored as? List<NSHTTPCookie>)?.forEach { c ->
-                val name = c.name
-                if (name != null) respCookies[name] = c.value ?: ""
+            (stored as? List<*>)?.forEach { item ->
+                (item as? NSHTTPCookie)?.let { c ->
+                    respCookies[c.name] = c.value
+                }
             }
             cont.resumeWith(Result.success(HttpResult(status, bytes, respHeaders, respCookies)))
         }.resume()

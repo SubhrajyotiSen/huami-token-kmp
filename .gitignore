@@ -191,3 +191,9 @@ fabric.properties
 # Vercel serverless function build output
 /api/*
 !/api/proxy.js
+
+# Xcode
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcscmblueprint

@@ -47,8 +47,10 @@ or Xiaomi Mi Fitness servers and retrieves the Bluetooth pairing keys of bound w
 # Android APK (needs SDK)
 ./gradlew :androidApp:assembleDebug
 
-# iOS framework (needs Xcode): link the XCFramework into iosApp/
-./gradlew :shared:assembleSharedXCFramework
+# iOS App (needs Xcode)
+# Open iosApp/iosApp.xcodeproj in Xcode and run on a simulator or device.
+# Alternatively build via command line:
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
 
 CLI flags mirror the Python tool: `-m {amazfit,xiaomi}` (required),
@@ -56,10 +58,7 @@ CLI flags mirror the Python tool: `-m {amazfit,xiaomi}` (required),
 `-g/--gps` (Amazfit: downloads archives + builds `gps_uihh.bin`),
 `-n/--no_logout`.
 
-iOS wiring: in Xcode create an app from `iosApp/`, add the built
-`shared.xcframework` (Framework Search Paths), `import shared`, build.
-`TokenRepository.fetchDevices` is a `suspend` function and appears in Swift
-with a completion handler.
+iOS wiring: Open `iosApp/iosApp.xcodeproj` directly in Xcode. The project is configured with a build script phase that automatically invokes `./gradlew :shared:embedAndSignAppleFrameworkForXcode` to build and embed the shared Kotlin framework into the app bundle.
 
 ## Web, CORS & Serverless Proxy
 

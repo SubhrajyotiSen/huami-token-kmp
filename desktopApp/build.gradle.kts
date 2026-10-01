@@ -9,7 +9,8 @@ plugins {
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
-    implementation(libs.compose.material3)
+    implementation(compose.material3)
+    implementation(compose.components.uiToolingPreview)
     implementation(libs.kotlinx.coroutines.swing)
 }
 
