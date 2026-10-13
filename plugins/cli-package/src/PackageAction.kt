@@ -3,8 +3,6 @@ package org.huamitoken.clipkg
 import org.jetbrains.amper.plugins.*
 import java.io.File
 import java.nio.file.Path
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /**
  * Reads the `VERSION_NAME` property from `gradle.properties` at the project root.
@@ -95,30 +93,21 @@ fun packageCli(
             "java -cp \"%APP_DIR%\\lib\\*\" $mainClassName %*\n"
         )
 
-        // Create the zip file
+        // Create the zip file using the `zip` command to preserve executable permissions
         System.out.println("Creating $zipName ...")
-        val zos = ZipOutputStream(zipFile.outputStream())
-        try {
-            zos.zipDirectory(appDir, appName)
-        } finally {
-            zos.close()
+        val zipProcess = ProcessBuilder().apply {
+            command("zip", "-r", zipFile.absolutePath, appName)
+            directory(stagingDir)
+        }.start()
+        zipProcess.inputStream.copyTo(System.out)
+        zipProcess.errorStream.copyTo(System.err)
+        val exitCode = zipProcess.waitFor()
+        if (exitCode != 0) {
+            throw RuntimeException("zip command failed with exit code $exitCode")
         }
 
         System.out.println("Created ${zipFile.absolutePath} (${zipFile.length()} bytes)")
     } finally {
         stagingDir.deleteRecursively()
-    }
-}
-
-private fun ZipOutputStream.zipDirectory(baseDir: File, entryPrefix: String) {
-    baseDir.listFiles()?.forEach { file ->
-        val entryPath = "$entryPrefix/${file.name}"
-        if (file.isDirectory) {
-            zipDirectory(file, entryPath)
-        } else {
-            putNextEntry(ZipEntry(entryPath))
-            file.inputStream().copyTo(this)
-            closeEntry()
-        }
     }
 }
