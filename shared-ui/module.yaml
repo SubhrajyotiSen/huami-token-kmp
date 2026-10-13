@@ -1,0 +1,37 @@
+# shared-ui: KMP library with Compose for JVM, Android, iOS, and JS
+product:
+  type: kmp/lib
+  platforms: [jvm, android, iosArm64, iosSimulatorArm64, js]
+
+apply:
+  - //common.module-template.yaml
+
+dependencies:
+  - //shared-core
+  - $compose.foundation: exported
+  - $compose.material3: exported
+  - $compose.ui: exported
+  - $compose.components.resources: exported
+  - org.jetbrains.compose.material:material-icons-extended:1.7.3: exported
+  - org.jetbrains.compose.ui:ui-tooling-preview:1.13.0-alpha01: exported
+
+dependencies@jvm:
+  - $compose.desktop.currentOs: exported
+  - org.jetbrains.compose.ui:ui-tooling:1.13.0-alpha01: exported
+
+dependencies@android:
+  - androidx.activity:activity-compose:1.13.0: exported
+  - androidx.appcompat:appcompat:1.7.1: exported
+  - androidx.compose.ui:ui-tooling:1.7.3: exported
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.20
+
+settings:
+  android:
+    namespace: org.huamitoken.shared.ui
+    compileSdk: 37
+    minSdk: 24
+  compose:
+    enabled: true
+    version: 1.13.0-alpha01

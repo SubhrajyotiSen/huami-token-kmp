@@ -197,3 +197,7 @@ fabric.properties
 project.xcworkspace/xcuserdata/
 xcuserdata/
 *.xcscmblueprint
+
+# Junie agent files
+.junie/
+.DS_Store

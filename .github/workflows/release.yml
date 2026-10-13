@@ -22,13 +22,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build CLI distribution
-        run: ./gradlew :cli:distZip --no-daemon
+      - name: Build CLI
+        run: ./kotlin build --module cli
+
+      - name: Package CLI
+        run: ./kotlin do packageCli --module cli
 
       - name: Upload CLI to release
         uses: softprops/action-gh-release@v2
         with:
-          files: cli/build/distributions/cli.zip
+          files: cli/build/distributions/*.zip
 
   # ── Desktop macOS (.dmg) ────────────────────────────────────────
   desktop-macos:
@@ -43,13 +46,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build macOS distribution
-        run: ./gradlew :desktopApp:packageReleaseDmg --no-daemon
+      - name: Build desktop app
+        run: ./kotlin build --module desktopApp
+
+      - name: Package desktop app
+        run: ./kotlin do packageDesktop --module desktopApp
 
       - name: Upload macOS DMG to release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+          files: desktopApp/build/packages/*.dmg
 
   # ── Desktop Windows (.msi) ──────────────────────────────────────
   desktop-windows:
@@ -64,13 +70,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build Windows distribution
-        run: ./gradlew :desktopApp:packageReleaseMsi --no-daemon
+      - name: Build desktop app
+        run: ./kotlin.bat build --module desktopApp
+
+      - name: Package desktop app
+        run: ./kotlin.bat do packageDesktop --module desktopApp
 
       - name: Upload Windows MSI to release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktopApp\build\compose\binaries\main-release\msi\*.msi
+          files: desktopApp\build\packages\*.msi
 
   # ── Desktop Linux (.deb) ────────────────────────────────────────
   desktop-linux:
@@ -85,10 +94,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build Linux distribution
-        run: ./gradlew :desktopApp:packageReleaseDeb --no-daemon
+      - name: Build desktop app
+        run: ./kotlin build --module desktopApp
+
+      - name: Package desktop app
+        run: ./kotlin do packageDesktop --module desktopApp
 
       - name: Upload Linux Deb to release
         uses: softprops/action-gh-release@v2
         with:
-          files: desktopApp/build/compose/binaries/main-release/deb/*.deb
+          files: desktopApp/build/packages/*.deb

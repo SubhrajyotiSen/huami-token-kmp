@@ -1,0 +1,2 @@
+# CLI packaging plugin — produces a zip distribution with executable JAR and launcher script
+product: jvm/amper-plugin

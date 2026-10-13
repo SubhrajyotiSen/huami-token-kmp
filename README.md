@@ -25,52 +25,104 @@ brew install huami-token
 
 ## Modules
 
-| Module | Target | Notes |
+| Module | Target | Build system |
 |---|---|---|
-| `:shared` | Android, iOS, JVM, JS | All protocol logic, crypto, parsing, `TokenRepository` UI facade, Compose UI |
-| `:cli` | JVM console app | `huami-token -m amazfit -e … -p … -b` (mirrors `cli.py`) |
-| `:desktopApp` | Desktop (macOS, Windows, Linux) | Compose Multiplatform (Material 3) desktop application |
-| `:androidApp` | Android app | Single screen (Compose Material 3): context + fields + button + results |
-| `:web` | Browser (Kotlin/JS) | Single page: context + e-mail/password + button + results |
-| `:serverlessProxy` | Node.js / Vercel (Kotlin/JS) | Serverless proxy route resolving CORS & cookie headers (`/api/proxy`) |
-| `iosApp/` | iOS (SwiftUI) | `ContentView.swift` consuming the shared framework |
+| `shared-core` | KMP library (JVM, Android, iOS, JS) | Kotlin Toolchain |
+| `shared-ui` | KMP Compose UI (JVM, Android, iOS, JS) | Kotlin Toolchain |
+| `cli` | JVM console app | Kotlin Toolchain |
+| `web` | Browser (Kotlin/JS) | Gradle |
+| `serverlessProxy` | Node.js / Vercel (Kotlin/JS) | Kotlin Toolchain |
+| `androidApp` | Android app | Kotlin Toolchain |
+| `desktopApp` | Desktop (macOS, Windows, Linux) | Kotlin Toolchain (custom plugin) |
+| `iosApp/` | iOS (SwiftUI) | Xcode |
 
 ## Prerequisites
 
-- JDK 17+, Gradle 8.10+
-- Android SDK (compileSdk 34) for `:shared` Android artifacts and `:androidApp`
-- Xcode 15+ for the iOS framework + `iosApp`
+- JDK 17+
+- [Kotlin Toolchain](https://kotlin-toolchain.org/) (auto-provisioned via `./kotlin` wrapper)
+- Android SDK for `androidApp`
+- Xcode 15+ for iOS framework + `iosApp`
+
+## Build System Notes
+
+This project uses the [Kotlin Toolchain](https://kotlin-toolchain.org/) for most modules, with Gradle retained for the web module and custom Kotlin Toolchain plugins for CLI distribution and desktop native packaging.
+
+### Web module: Why Gradle?
+
+The Kotlin Toolchain's `js/app` product is in incomplete preview. While it compiles Kotlin/JS code to `.klib` intermediate files, the `linkJs` task that converts these to browser-executable JavaScript (`.mjs`) does not produce output. This means `kotlin build --module web` succeeds but generates no deployable artifacts.
+
+Gradle's Kotlin/JS plugin handles the complete pipeline: compile → link → webpack bundle → browser-distributable output (`index.html` + `huami-token-web.js`). Until the Kotlin Toolchain's JS linker is fully functional, Gradle remains the only reliable way to produce the web bundle.
+
+The web build command is:
+```bash
+./gradlew :web:jsBrowserDistribution   # → web/build/dist/js/productionExecutable/
+```
+
+### CLI module: Custom zip distribution plugin
+
+The Kotlin Toolchain's `package` command for `jvm/app` produces only an executable JAR, not a zip distribution with launcher scripts like Gradle's `distZip`. To bridge this gap, the project includes a custom Kotlin Toolchain plugin (`plugins/cli-package/`) that:
+
+1. **Collects runtime JARs** — Copies all dependencies and the module JAR into a `lib/` directory.
+2. **Creates launcher scripts** — Generates a shell script (`bin/cli`) and a Windows batch file (`bin/cli.bat`) that run the app with the correct classpath.
+3. **Packages a zip** — Produces `cli/build/distributions/cli-<version>.zip` ready for distribution.
+
+The plugin reads the version from `gradle.properties` and is invoked via:
+```bash
+./kotlin do packageCli --module cli
+```
+
+### Desktop module: Custom jpackage plugin
+
+The Kotlin Toolchain's `package` CLI supports only built-in formats (`jar`, `executable-jar`, `aab`, `maven-central-bundle`). It does not support Compose Desktop's native installer formats (`.dmg`, `.msi`, `.deb`) that Gradle's Compose Desktop plugin provides.
+
+To bridge this gap, the project includes a custom Kotlin Toolchain plugin (`plugins/desktop-package/`) that:
+
+1. **Invokes `jpackage`** — The JDK 17+ native packaging tool that creates platform-specific installers.
+2. **Filters formats by OS** — macOS produces `.dmg`/`.pkg`, Windows produces `.msi`/`.exe`, Linux produces `.deb`/`.rpm`.
+3. **Stages runtime JARs** — Copies all classpath JARs to a temporary directory for `jpackage` to bundle.
+4. **Copies artifacts** — Moves final installers to `desktopApp/build/packages/` for predictable CI paths.
+
+The plugin is enabled in `desktopApp/module.yaml` and invoked via:
+```bash
+./kotlin do packageDesktop --module desktopApp
+```
+
+This approach replaces the Gradle Compose Desktop plugin's `packageReleaseDmg`/`packageReleaseMsi`/`packageReleaseDeb` tasks with a single cross-platform command.
+
+### Version management
+
+The project version is defined in `gradle.properties` as `VERSION_NAME`. The desktop packaging plugin reads this value at build time, so the installer version always matches the project version. To bump the version, update `gradle.properties` — the desktop plugin and Android module should be kept in sync with it.
 
 ## Commands
 
 ```bash
-# Shared unit tests (crypto vectors, parsing, uihh, zip) on JVM
-./gradlew :shared:jvmTest
+# Build all modules
+./kotlin build
 
-# Desktop App (Compose Multiplatform)
-./gradlew :desktopApp:run
-./gradlew :desktopApp:packageDistributionForCurrentOS
+# Run tests
+./kotlin test
 
 # CLI
-./gradlew :cli:run --args="-m amazfit -e you@example.com -p secret --bt_keys"
-./gradlew :cli:installDist   # → cli/build/install/huami-token/bin/huami-token
+./kotlin run --module cli --args="-m amazfit -e you@example.com -p secret --bt_keys"
+./kotlin build --module cli
+./kotlin do packageCli --module cli   # → cli/build/distributions/cli-<version>.zip
 
-# Web (dev server with hot reload)
-./gradlew :web:jsBrowserDevelopmentRun
-# Production bundle (+ copy web/src/main/resources/index.html next to it)
-./gradlew :web:jsBrowserDistribution
+# Web (uses Gradle — see Build System Notes below)
+./gradlew :web:jsBrowserDistribution   # → web/build/dist/js/productionExecutable/
 
-# Serverless Proxy (Kotlin/JS for Vercel / Node.js)
-./gradlew :serverlessProxy:jsNodeTest
-./gradlew :serverlessProxy:copyVercelProxy
+# Serverless Proxy
+./kotlin test --module serverlessProxy
 
-# Android APK (needs SDK)
-./gradlew :androidApp:assembleDebug
+# Android
+./kotlin build --module androidApp
+./kotlin run --module androidApp
 
-# iOS App (needs Xcode)
+# Desktop (uses custom jpackage plugin — see Build System Notes below)
+./kotlin run --module desktopApp
+./kotlin do packageDesktop --module desktopApp   # creates .dmg/.msi/.deb in desktopApp/build/packages/
+
+# iOS (needs Xcode)
 # Open iosApp/iosApp.xcodeproj in Xcode and run on a simulator or device.
-# Alternatively build via command line:
-xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
 
 CLI flags mirror the Python tool: `-m {amazfit,xiaomi}` (required),
@@ -78,7 +130,7 @@ CLI flags mirror the Python tool: `-m {amazfit,xiaomi}` (required),
 `-g/--gps` (Amazfit: downloads archives + builds `gps_uihh.bin`),
 `-n/--no_logout`.
 
-iOS wiring: Open `iosApp/iosApp.xcodeproj` directly in Xcode. The project is configured with a build script phase that automatically invokes `./gradlew :shared:embedAndSignAppleFrameworkForXcode` to build and embed the shared Kotlin framework into the app bundle.
+iOS wiring: Open `iosApp/iosApp.xcodeproj` directly in Xcode. Build the shared framework with `./kotlin build --module shared-core` and `./kotlin build --module shared-ui` before opening Xcode.
 
 ## Web, CORS & Serverless Proxy
 
@@ -107,9 +159,9 @@ If Zepp/Xiaomi block datacenter IPs or require a captcha / 2FA, the web app show
 
 ## Vercel Deployment
 
-The project is preconfigured with `vercel.json` to deploy the single-page web application (`:web`) alongside the zero-dependency standalone Node.js serverless proxy (`api/proxy.js`).
+The project is preconfigured with `vercel.json` to deploy the single-page web application alongside the zero-dependency standalone Node.js serverless proxy (`api/proxy.js`). The web module is built with Gradle, as the Kotlin Toolchain's JS linker does not yet produce browser-distributable output (see Build System Notes).
 
-### 1. Build and Route Architecture (`vercel.json`)
+### Build and Route Architecture (`vercel.json`)
 
 ```json
 {
@@ -124,36 +176,28 @@ The project is preconfigured with `vercel.json` to deploy the single-page web ap
 }
 ```
 
-- **Static Web Frontend:** Compiled from `:web` to `web/build/dist/js/productionExecutable` (serving `index.html` and `huami-token-web.js`).
-- **Serverless API Function:** Executed directly from `api/proxy.js` on Node.js without requiring extra Gradle compilation or cold-start penalties, handling `/api/proxy?url=...`.
+- **Static Web Frontend:** Compiled from the `web` module via Gradle to `web/build/dist/js/productionExecutable` (serving `index.html` and `huami-token-web.js`).
+- **Serverless API Function:** Executed directly from `api/proxy.js` on Node.js, handling `/api/proxy?url=...` for CORS and cookie forwarding.
 
-### 2. Deployment Instructions
+### Deployment
 
-#### Option A: Deploy via Vercel CLI
+#### Deploy via Vercel CLI
 
-1. Ensure prerequisites (JDK 17+) and Vercel CLI are installed:
+1. Install Vercel CLI:
    ```bash
    npm install -g vercel
    ```
-2. Build the production web bundle:
+2. Deploy:
    ```bash
-   ./gradlew :web:jsBrowserDistribution
-   ```
-3. Deploy to Vercel:
-   ```bash
-   # Preview deployment
-   vercel
-
-   # Production deployment
-   vercel --prod
+   vercel          # preview
+   vercel --prod   # production
    ```
 
-#### Option B: Deploy via Vercel Git Integration
+#### Deploy via Vercel Git Integration
 
 1. Push the repository to GitHub, GitLab, or Bitbucket.
 2. Import the project in the [Vercel Dashboard](https://vercel.com/new).
-3. Ensure the build environment has Java 17+ available or pre-build artifacts via CI/CD before deploying.
-4. Vercel automatically applies `vercel.json`, building the web interface and executing `api/proxy.js` to deliver full multiplatform functionality with fast build times.
+3. Vercel automatically applies `vercel.json`, running `./gradlew :web:jsBrowserDistribution` to compile the web interface and executing `api/proxy.js` to deliver full multiplatform functionality.
 
 ## Credits & Attribution
 

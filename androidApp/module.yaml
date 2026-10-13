@@ -1,0 +1,26 @@
+# androidApp: Android application with Compose
+product: android/app
+
+apply:
+  - //common.module-template.yaml
+
+dependencies:
+  - //shared-ui
+  - //shared-core
+  - androidx.compose.material3:material3:1.3.0
+  - androidx.compose.ui:ui:1.7.3
+  - androidx.compose.ui:ui-tooling-preview:1.7.3
+  - androidx.activity:activity-compose:1.13.0
+  - org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0
+
+settings:
+  android:
+    namespace: org.huamitoken.android
+    compileSdk: 37
+    minSdk: 24
+    targetSdk: 37
+    applicationId: org.huamitoken.android
+    versionCode: 1
+    versionName: "1.0.3"
+  compose:
+    enabled: true

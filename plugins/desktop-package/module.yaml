@@ -1,0 +1,2 @@
+# Desktop packaging plugin — produces .dmg, .msi, .deb via jpackage
+product: jvm/amper-plugin

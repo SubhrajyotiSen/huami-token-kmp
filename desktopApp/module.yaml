@@ -1,0 +1,23 @@
+# desktopApp: JVM desktop application with Compose
+product: jvm/app
+
+apply:
+  - //common.module-template.yaml
+
+dependencies:
+  - //shared-ui
+  - //shared-core
+  - $compose.desktop.currentOs
+  - $compose.material3
+  - org.jetbrains.compose.ui:ui-tooling-preview:1.13.0-alpha01
+  - org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0
+
+settings:
+  jvm:
+    mainClass: org.huamitoken.desktop.MainKt
+  compose:
+    enabled: true
+
+plugins:
+  desktop-package:
+    enabled: true

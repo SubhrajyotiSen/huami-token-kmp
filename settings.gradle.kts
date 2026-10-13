@@ -18,9 +18,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "huami-token-kmp"
 include(":shared-core")
-include(":shared-ui")
-include(":cli")
 include(":web")
-include(":serverlessProxy")
-include(":androidApp")
-include(":desktopApp")

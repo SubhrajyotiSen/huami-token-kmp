@@ -1,0 +1,10 @@
+# web: JS browser application
+product: js/app
+
+apply:
+  - //common.module-template.yaml
+
+dependencies:
+  - //shared-core
+  - org.jetbrains.kotlinx:kotlinx-browser:0.5.0
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0

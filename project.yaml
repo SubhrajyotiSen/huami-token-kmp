@@ -1,0 +1,14 @@
+modules:
+  - ./androidApp
+  - ./cli
+  - ./desktopApp
+  - ./plugins/cli-package
+  - ./plugins/desktop-package
+  - ./serverlessProxy
+  - ./shared-core
+  - ./shared-ui
+  - ./web
+
+plugins:
+  - ./plugins/cli-package
+  - ./plugins/desktop-package

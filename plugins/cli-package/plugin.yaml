@@ -1,0 +1,13 @@
+tasks:
+  packageCli:
+    action:
+      !org.huamitoken.clipkg.packageCli
+      runtimeClasspath: ${module.runtimeClasspath}
+      moduleJar: ${module.jar}
+      outputDir: ${taskOutputDir}
+      moduleRootDir: ${module.rootDir}
+      mainClass: ${module.settings.jvm.mainClass}
+      moduleName: ${module.name}
+
+commands:
+  - packageCli

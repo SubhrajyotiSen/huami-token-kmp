@@ -1,0 +1,6 @@
+# Common settings shared across all modules
+settings:
+  kotlin:
+    version: 2.4.20
+  jvm:
+    release: 17

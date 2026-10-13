@@ -1,0 +1,19 @@
+# shared-core: KMP library for JVM, Android, iOS, and JS
+product:
+  type: kmp/lib
+  platforms: [jvm, android, iosArm64, iosSimulatorArm64, js]
+
+apply:
+  - //common.module-template.yaml
+
+dependencies:
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.20
+
+settings:
+  android:
+    namespace: org.huamitoken.shared.core
+    compileSdk: 37
+    minSdk: 24

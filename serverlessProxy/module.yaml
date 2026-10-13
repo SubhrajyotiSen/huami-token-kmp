@@ -1,0 +1,13 @@
+# serverlessProxy: JS Node.js application
+product: js/app
+
+apply:
+  - //common.module-template.yaml
+
+dependencies:
+  - //shared-core
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.20
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0

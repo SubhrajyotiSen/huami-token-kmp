@@ -13,10 +13,13 @@ kotlin {
     }
 
     sourceSets {
-        jsMain.dependencies {
-            implementation(project(":shared-core"))
-            implementation(libs.kotlinx.browser)
-            implementation(libs.kotlinx.coroutines.core)
+        val jsMain = getByName("jsMain").apply {
+            kotlin.srcDir("src")
+            dependencies {
+                implementation(project(":shared-core"))
+                implementation(libs.kotlinx.browser)
+                implementation(libs.kotlinx.coroutines.core)
+            }
         }
     }
 }

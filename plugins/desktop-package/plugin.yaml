@@ -1,0 +1,16 @@
+tasks:
+  packageDesktop:
+    action:
+      !org.huamitoken.desktoppkg.packageDesktop
+      appClasspath: ${module.runtimeClasspath}
+      moduleJar: ${module.jar}
+      mainClass: ${module.settings.jvm.mainClass}
+      outputDir: ${taskOutputDir}
+      moduleRootDir: ${module.rootDir}
+      packageName: huami-token
+      targetFormats: [dmg, msi, deb]
+      appId: org.huamitoken.desktop
+      vendor: ""
+
+commands:
+  - packageDesktop
